@@ -9,6 +9,11 @@ import {
 const ratingService = new RatingService();
 
 export class RatingController {
+  /**
+   * @description Get the rating of a talent with a given ID.
+   * @param {Request} req The request object.
+   * @param {Response} res The response object.
+   */
   public getTalentRating(req: Request, res: Response): void {
     const { talentId } = req.params;
     const { includeHistory } = req.query;
@@ -23,6 +28,11 @@ export class RatingController {
     }
   }
 
+  /**
+   * @description Update the rating of a talent with a given ID.
+   * @param {Request} req The request object.
+   * @param {Response} res The response object.
+   */
   public updateTalentRating(req: Request, res: Response): void {
     const { talentId } = req.params;
     const inputScores: BaseScoreInput = req.body;
@@ -50,6 +60,11 @@ export class RatingController {
     // res.status(200).json(newTalentState);
   }
 
+  /**
+   * @description Update the interview score of a talent with a given ID.
+   * @param {Request} req The request object.
+   * @param {Response} res The response object.
+   */
   public updateInterviewScore(req: Request, res: Response): void {
     const { talentId } = req.params;
     const { score } = req.body;
@@ -63,6 +78,11 @@ export class RatingController {
     res.status(200).json(newTalentState);
   }
 
+  /**
+   * @description Update the family tree score of a talent with a given ID.
+   * @param {Request} req The request object.
+   * @param {Response} res The response object.
+   */
   public updateFamilyTreeScore(req: Request, res: Response): void {
     const { talentId } = req.params;
     const { score } = req.body;
@@ -76,6 +96,11 @@ export class RatingController {
     res.status(200).json(newTalentState);
   }
 
+  /**
+   * @description Update the assessment score of a talent with a given ID.
+   * @param {Request} req The request object.
+   * @param {Response} res The response object.
+   */
   public updateAssessmentScore(req: Request, res: Response): void {
     const { talentId } = req.params;
     const { score } = req.body;
@@ -89,6 +114,11 @@ export class RatingController {
     res.status(200).json(newTalentState);
   }
 
+  /**
+   * @description Update the profile quality score of a talent with a given ID.
+   * @param {Request} req The request object.
+   * @param {Response} res The response object.
+   */
   public updateProfileQualityScore(req: Request, res: Response): void {
     const { talentId } = req.params;
     const { score } = req.body;
@@ -105,6 +135,11 @@ export class RatingController {
     res.status(200).json(newTalentState);
   }
 
+  /**
+   * @description Update the spotlight performance score of a talent with a given ID.
+   * @param {Request} req The request object.
+   * @param {Response} res The response object.
+   */
   public updateSpotlightPerformanceScore(req: Request, res: Response): void {
     const { talentId } = req.params;
     const { score } = req.body;

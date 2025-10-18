@@ -1,0 +1,11 @@
+The default overall 400 rating is because the default profile completion score is 100, interview is 100, skill assessment is 100, family tree score is 0, spotlightEngagement is 100 adding up to 400
+interview score is received
+it is converted to (+-)
+How do we convert to (+-) ?
+ - For interviews if the score(over 10) is equal to three, it becomes zero, if it is less than three it goes negative, and above three is positive up to 30(that is 10/10 equals 30 and 0/10 equals -30). The same goes for Assessments by 25 not 30
+multiplied by the k factor
+added to the previous entry
+ Overall score is calculated after the update
+new entry is added to that users rating.
+
+For profile completion, family tree score, and spotlight engagement, they are not converted to (+-)

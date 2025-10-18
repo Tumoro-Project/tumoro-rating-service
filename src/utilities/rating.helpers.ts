@@ -1,21 +1,41 @@
 
 import { BaseScoreInput } from '../models/IDataModels';
 
-const WEIGHTS = {
-    interviewScore: 0.35,
-    familyTreeScore: 0.35,
-    assessmentScore: 0.25,
-    profileQualityScore: 0.03,
-    spotlightPerformanceScore: 0.02,
-};
+function convertInterviewScore(score: number): number {
+    if (score < 0 || score > 10) {
+        // Or handle as per application's error handling strategy
+        throw new Error("Interview score must be between 0 and 10.");
+    }
+    if (score <= 3) {
+        return 10 * score - 30;
+    } else {
+        return (30 / 7) * score - (90 / 7);
+    }
+}
+
+function convertAssessmentScore(score: number): number {
+    if (score < 0 || score > 10) {
+        // Or handle as per application's error handling strategy
+        throw new Error("Assessment score must be between 0 and 10.");
+    }
+    if (score <= 3) {
+        return (25 / 3) * score - 25;
+    } else {
+        return (25 / 7) * score - (75 / 7);
+    }
+}
 
 export function calculateBaseScore(inputScores: BaseScoreInput): number {
+    const convertedInterviewScore = convertInterviewScore(inputScores.interviewScore);
+    const convertedAssessmentScore = convertAssessmentScore(inputScores.assessmentScore);
+
     const baseScore =
-        inputScores.interviewScore * WEIGHTS.interviewScore +
-        inputScores.familyTreeScore * WEIGHTS.familyTreeScore +
-        inputScores.assessmentScore * WEIGHTS.assessmentScore +
-        inputScores.profileQualityScore * WEIGHTS.profileQualityScore +
-        inputScores.spotlightPerformanceScore * WEIGHTS.spotlightPerformanceScore;
+        convertedInterviewScore +
+        convertedAssessmentScore +
+        inputScores.familyTreeScore +
+        inputScores.profileQualityScore +
+        inputScores.spotlightPerformanceScore;
+
     return baseScore;
 }
 
@@ -30,5 +50,5 @@ export function determineKFactor(engagementCount: number): number {
 }
 
 export function calculateNewRating(currentRating: number, baseScore: number, kFactor: number): number {
-    return currentRating + kFactor * (baseScore - currentRating);
+    return currentRating + kFactor * baseScore;
 }

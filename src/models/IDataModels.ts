@@ -1,4 +1,3 @@
-
 export interface BaseScoreInput {
   interviewScore: number;
   familyTreeScore: number;
@@ -22,8 +21,8 @@ export interface RatingEntry {
   timestamp: Date;
   previousRating: number;
   newRating: number;
-  baseScore: number;
   kFactorUsed: number;
   newEngagementCount: number;
   inputScores: BaseScoreInput;
+  currentScores: BaseScoreInput;
 }
