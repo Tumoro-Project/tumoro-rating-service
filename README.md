@@ -6,8 +6,10 @@ This service provides a robust and flexible system for calculating and managing 
 
 *   **Talent Rating Management:** Retrieve and update talent ratings.
 *   **Individual Score Updates:** Update specific scores such as interview, assessment, family tree, profile quality, and spotlight performance.
+*   **Event-Driven Integration:** Process activity events from other services to automatically trigger rating updates.
 *   **Dynamic K-Factor:** Incorporates a K-factor based on engagement count for nuanced rating adjustments.
-*   **Comprehensive Rating History:** Maintains a detailed history of all rating changes for each talent.
+*   **Comprehensive Rating History:** Maintains a detailed history of all rating changes and activity events for each talent.
+*   **Database Persistence:** Robust PostgreSQL storage for ratings, history, and events.
 *   **API Documentation:** Integrated Swagger UI for easy exploration and testing of API endpoints.
 
 ## Getting Started
@@ -33,6 +35,22 @@ Ensure you have the following installed:
     npm install
     ```
 
+### Configuration
+
+Create a `.env` file in the root directory and add the following:
+
+```env
+PORT=3002
+NODE_ENV=development
+
+# PostgreSQL Connection
+DATABASE_URL=your_postgres_connection_string
+
+# Authentication
+JWT_SECRET=your_jwt_secret
+SERVICE_SECRET=your_service_to_service_secret
+```
+
 ### Running the Service
 
 To start the development server:
@@ -41,13 +59,13 @@ To start the development server:
 npm run dev
 ```
 
-The service will be running on `http://localhost:3000`.
+The service will be running on `http://localhost:3002` (or the port specified in your `.env`).
 
 ## API Documentation
 
 Interactive API documentation is available via Swagger UI once the service is running. Access it at:
 
-[http://localhost:3000/api-docs](http://localhost:3000/api-docs)
+[http://localhost:3002/api-docs](http://localhost:3002/api-docs)
 
 This documentation provides detailed information about each endpoint, including parameters, request bodies, and response schemas.
 
@@ -90,21 +108,30 @@ Update a talent's rating by providing a complete set of input scores.
 
 Update a specific score component for a talent. Each endpoint expects a `SingleScoreInput` in the request body.
 
-*   **URL:** `/v1/ratings/update/:talentId/interview-score`
-*   **URL:** `/v1/ratings/update/:talentId/family-tree-score`
-*   **URL:** `/v1/ratings/update/:talentId/assessment-score`
-*   **URL:** `/v1/ratings/update/:talentId/profile-quality-score`
-*   **URL:** `/v1/ratings/update/:talentId/spotlight-performance-score`
+*   **URL:** `/v1/ratings/update/:talentId/{component}-score`
+*   **Components:** `interview`, `family-tree`, `assessment`, `profile-quality`, `spotlight-performance`
 *   **Method:** `POST`
-*   **Parameters:**
-    *   `talentId` (path): ID of the talent (string, required).
 *   **Request Body:** `SingleScoreInput` object (JSON).
-    ```json
-    {
-      "score": 75
-    }
-    ```
 *   **Response:** `TalentState` object.
+
+### 4. Event-Driven Updates (Internal)
+
+These endpoints are used by other microservices to trigger rating updates via activity events. These routes require `SERVICE_SECRET` authentication.
+
+*   **POST** `/internal/events`: Emit a new activity event (e.g., `interview.completed`).
+*   **POST** `/internal/events/:eventId/retry`: Retry a failed event.
+*   **GET** `/internal/events/:talentId`: Retrieve activity event history for a talent.
+*   **GET** `/internal/events/failed`: Retrieve all failed events.
+
+**Internal Event Payload Example:**
+```json
+{
+  "talentId": "user-uuid",
+  "eventType": "interview.completed",
+  "sourceService": "tumoro-interview-schedule",
+  "payload": { "score": 8.5 }
+}
+```
 
 ## Data Models
 
@@ -134,24 +161,24 @@ interface RatingEntry {
   timestamp: Date;
   previousRating: number;
   newRating: number;
-  baseScore: number; // Aggregated score before kFactor application to individual components
   kFactorUsed: number;
   newEngagementCount: number;
   inputScores: BaseScoreInput;
+  currentScores: BaseScoreInput;
 }
 ```
 
 ### `BaseScoreInput`
 
-Input model for updating all score components simultaneously.
+Input model for updating score components.
 
 ```typescript
 interface BaseScoreInput {
-  interviewScore: number;
-  familyTreeScore: number;
-  assessmentScore: number;
-  profileQualityScore: number;
-  spotlightPerformanceScore: number;
+  interviewScore?: number;
+  familyTreeScore?: number;
+  assessmentScore?: number;
+  profileQualityScore?: number;
+  spotlightPerformanceScore?: number;
 }
 ```
 
@@ -176,13 +203,13 @@ Here's a quick example of how to integrate with the rating service using `curl`.
 ### 1. Get a Talent's Initial State (or create if not exists)
 
 ```bash
-curl -X GET "http://localhost:3000/v1/talent/talent123/rating?includeHistory=true"
+curl -X GET "http://localhost:3002/v1/talent/talent123/rating?includeHistory=true"
 ```
 
 ### 2. Update All Scores for a Talent
 
 ```bash
-curl -X POST "http://localhost:3000/v1/ratings/update/talent123" \
+curl -X POST "http://localhost:3002/v1/ratings/update/talent123" \
      -H "Content-Type: application/json" \
      -d '{
            "interviewScore": 7,
@@ -196,7 +223,7 @@ curl -X POST "http://localhost:3000/v1/ratings/update/talent123" \
 ### 3. Update a Single Score (e.g., Interview Score)
 
 ```bash
-curl -X POST "http://localhost:3000/v1/ratings/update/talent123/interview-score" \
+curl -X POST "http://localhost:3002/v1/ratings/update/talent123/interview-score" \
      -H "Content-Type: application/json" \
      -d '{
            "score": 9

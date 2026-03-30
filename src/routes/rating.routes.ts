@@ -1,30 +1,46 @@
-
 import { Router } from 'express';
 import { RatingController } from '../controllers/rating.controller';
 import { validate } from '../middleware/validation';
 import { baseScoreSchema, singleScoreSchema } from '../middleware/schemas';
+import { authenticate, authenticateService, requireRole } from '../middleware/auth.middleware';
+import { UserRole } from '../types';
 
 const router = Router();
 const ratingController = new RatingController();
 
+// Roles allowed to write scores: admin and reviewer
+const canWriteRatings = [authenticate, requireRole(UserRole.ADMIN, UserRole.REVIEWER)];
+
+// Internal services can also write ratings directly
+const canWriteRatingsOrService = [
+    (req: any, res: any, next: any) => {
+        const authHeader = req.headers.authorization || '';
+        // If it's a service call (Bearer service JWT or Service secret), use service auth
+        if (authHeader.startsWith('Service ')) {
+            return authenticateService(req, res, next);
+        }
+        // Otherwise validate as a normal user with role guard
+        authenticate(req, res, () => requireRole(UserRole.ADMIN, UserRole.REVIEWER)(req, res, next));
+    },
+];
 
 /**
  * @swagger
  * /v1/talent/{talentId}/rating:
  *   get:
  *     summary: Get talent rating
- *     description: Retrieve the rating of a talent with a given ID.
+ *     description: Retrieve the rating of a talent with a given ID. Requires authentication.
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: talentId
  *         required: true
- *         description: ID of the talent to retrieve the rating for.
  *         schema:
  *           type: string
  *       - in: query
  *         name: includeHistory
  *         required: false
- *         description: Whether to include the talent's rating history.
  *         schema:
  *           type: boolean
  *     responses:
@@ -34,22 +50,27 @@ const ratingController = new RatingController();
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/TalentState'
+ *       401:
+ *         description: Unauthorized
  */
-router.get('/v1/talent/:talentId/rating', ratingController.getTalentRating);
-
-
+router.get(
+    '/v1/talent/:talentId/rating',
+    authenticate,
+    ratingController.getTalentRating
+);
 
 /**
  * @swagger
  * /v1/ratings/update/{talentId}:
  *   post:
- *     summary: Update talent rating
- *     description: Update the rating of a talent with a given ID.
+ *     summary: Update talent rating (all scores)
+ *     description: Update the full rating of a talent. Requires admin or reviewer role, or a trusted service call.
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: talentId
  *         required: true
- *         description: ID of the talent to update the rating for.
  *         schema:
  *           type: string
  *     requestBody:
@@ -65,22 +86,29 @@ router.get('/v1/talent/:talentId/rating', ratingController.getTalentRating);
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/TalentState'
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Insufficient permissions
  */
-router.post('/v1/ratings/update/:talentId', validate(baseScoreSchema), ratingController.updateTalentRating);
-
-
+router.post(
+    '/v1/ratings/update/:talentId',
+    ...canWriteRatingsOrService,
+    validate(baseScoreSchema),
+    ratingController.updateTalentRating
+);
 
 /**
  * @swagger
  * /v1/ratings/update/{talentId}/interview-score:
  *   post:
  *     summary: Update interview score
- *     description: Update the interview score of a talent with a given ID.
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: talentId
  *         required: true
- *         description: ID of the talent to update the score for.
  *         schema:
  *           type: string
  *     requestBody:
@@ -97,21 +125,24 @@ router.post('/v1/ratings/update/:talentId', validate(baseScoreSchema), ratingCon
  *             schema:
  *               $ref: '#/components/schemas/TalentState'
  */
-router.post('/v1/ratings/update/:talentId/interview-score', validate(singleScoreSchema), ratingController.updateInterviewScore);
-
-
+router.post(
+    '/v1/ratings/update/:talentId/interview-score',
+    ...canWriteRatingsOrService,
+    validate(singleScoreSchema),
+    ratingController.updateInterviewScore
+);
 
 /**
  * @swagger
  * /v1/ratings/update/{talentId}/family-tree-score:
  *   post:
  *     summary: Update family tree score
- *     description: Update the family tree score of a talent with a given ID.
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: talentId
  *         required: true
- *         description: ID of the talent to update the score for.
  *         schema:
  *           type: string
  *     requestBody:
@@ -123,26 +154,25 @@ router.post('/v1/ratings/update/:talentId/interview-score', validate(singleScore
  *     responses:
  *       200:
  *         description: The updated talent rating.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/TalentState'
  */
-router.post('/v1/ratings/update/:talentId/family-tree-score', validate(singleScoreSchema), ratingController.updateFamilyTreeScore);
-
-
+router.post(
+    '/v1/ratings/update/:talentId/family-tree-score',
+    ...canWriteRatingsOrService,
+    validate(singleScoreSchema),
+    ratingController.updateFamilyTreeScore
+);
 
 /**
  * @swagger
  * /v1/ratings/update/{talentId}/assessment-score:
  *   post:
  *     summary: Update assessment score
- *     description: Update the assessment score of a talent with a given ID.
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: talentId
  *         required: true
- *         description: ID of the talent to update the score for.
  *         schema:
  *           type: string
  *     requestBody:
@@ -154,26 +184,25 @@ router.post('/v1/ratings/update/:talentId/family-tree-score', validate(singleSco
  *     responses:
  *       200:
  *         description: The updated talent rating.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/TalentState'
  */
-router.post('/v1/ratings/update/:talentId/assessment-score', validate(singleScoreSchema), ratingController.updateAssessmentScore);
-
-
+router.post(
+    '/v1/ratings/update/:talentId/assessment-score',
+    ...canWriteRatingsOrService,
+    validate(singleScoreSchema),
+    ratingController.updateAssessmentScore
+);
 
 /**
  * @swagger
  * /v1/ratings/update/{talentId}/profile-quality-score:
  *   post:
  *     summary: Update profile quality score
- *     description: Update the profile quality score of a talent with a given ID.
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: talentId
  *         required: true
- *         description: ID of the talent to update the score for.
  *         schema:
  *           type: string
  *     requestBody:
@@ -185,26 +214,25 @@ router.post('/v1/ratings/update/:talentId/assessment-score', validate(singleScor
  *     responses:
  *       200:
  *         description: The updated talent rating.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/TalentState'
  */
-router.post('/v1/ratings/update/:talentId/profile-quality-score', validate(singleScoreSchema), ratingController.updateProfileQualityScore);
-
-
+router.post(
+    '/v1/ratings/update/:talentId/profile-quality-score',
+    ...canWriteRatingsOrService,
+    validate(singleScoreSchema),
+    ratingController.updateProfileQualityScore
+);
 
 /**
  * @swagger
  * /v1/ratings/update/{talentId}/spotlight-performance-score:
  *   post:
  *     summary: Update spotlight performance score
- *     description: Update the spotlight performance score of a talent with a given ID.
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: talentId
  *         required: true
- *         description: ID of the talent to update the score for.
  *         schema:
  *           type: string
  *     requestBody:
@@ -216,12 +244,12 @@ router.post('/v1/ratings/update/:talentId/profile-quality-score', validate(singl
  *     responses:
  *       200:
  *         description: The updated talent rating.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/TalentState'
  */
-router.post('/v1/ratings/update/:talentId/spotlight-performance-score', validate(singleScoreSchema), ratingController.updateSpotlightPerformanceScore);
-
+router.post(
+    '/v1/ratings/update/:talentId/spotlight-performance-score',
+    ...canWriteRatingsOrService,
+    validate(singleScoreSchema),
+    ratingController.updateSpotlightPerformanceScore
+);
 
 export default router;

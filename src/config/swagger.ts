@@ -19,11 +19,11 @@ const swaggerDefinition = {
       BaseScoreInput: {
         type: 'object',
         properties: {
-          interviewScore: { type: 'number' },
-          familyTreeScore: { type: 'number' },
-          assessmentScore: { type: 'number' },
-          profileQualityScore: { type: 'number' },
-          spotlightPerformanceScore: { type: 'number' },
+          interviewScore: { type: 'number', nullable: true },
+          familyTreeScore: { type: 'number', nullable: true },
+          assessmentScore: { type: 'number', nullable: true },
+          profileQualityScore: { type: 'number', nullable: true },
+          spotlightPerformanceScore: { type: 'number', nullable: true },
         },
       },
       TalentState: {
@@ -59,13 +59,53 @@ const swaggerDefinition = {
           timestamp: { type: 'string', format: 'date-time' },
           previousRating: { type: 'number' },
           newRating: { type: 'number' },
-          baseScore: { type: 'number' },
           kFactorUsed: { type: 'number' },
           newEngagementCount: { type: 'number' },
           inputScores: {
             $ref: '#/components/schemas/BaseScoreInput',
           },
+          currentScores: {
+            $ref: '#/components/schemas/BaseScoreInput',
+          },
         },
+      },
+      ActivityEventPayload: {
+        type: 'object',
+        properties: {
+          score: { type: 'number', description: 'Raw score (0-10) for this component' },
+          metadata: { type: 'object', additionalProperties: true },
+        },
+        required: ['score'],
+      },
+      ActivityEvent: {
+        type: 'object',
+        properties: {
+          eventId: { type: 'string', format: 'uuid' },
+          talentId: { type: 'string' },
+          eventType: {
+            type: 'string',
+            enum: ['interview.completed', 'assessment.completed', 'profile.updated', 'spotlight.posted', 'family_tree.updated'],
+          },
+          sourceService: { type: 'string' },
+          payload: { $ref: '#/components/schemas/ActivityEventPayload' },
+          status: { type: 'string', enum: ['pending', 'processed', 'failed', 'skipped'] },
+          errorMessage: { type: 'string' },
+          createdAt: { type: 'string', format: 'date-time' },
+          processedAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      CreateEventDto: {
+        type: 'object',
+        properties: {
+          talentId: { type: 'string' },
+          eventType: {
+            type: 'string',
+            enum: ['interview.completed', 'assessment.completed', 'profile.updated', 'spotlight.posted', 'family_tree.updated'],
+          },
+          sourceService: { type: 'string' },
+          payload: { $ref: '#/components/schemas/ActivityEventPayload' },
+        },
+        required: ['talentId', 'eventType', 'sourceService', 'payload'],
       },
     },
   },

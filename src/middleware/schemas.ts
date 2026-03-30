@@ -1,13 +1,17 @@
-import Joi from "joi";
+import { z } from "zod";
 
-export const baseScoreSchema = Joi.object({
-  interviewScore: Joi.number().min(0).max(10).required(),
-  familyTreeScore: Joi.number().min(0).max(10).required(),
-  assessmentScore: Joi.number().min(0).max(10).required(),
-  profileQualityScore: Joi.number().min(0).max(10).required(),
-  spotlightPerformanceScore: Joi.number().min(0).required(),
+export const baseScoreSchema = z.object({
+  interviewScore: z.number().min(0).max(10),
+  familyTreeScore: z.number().min(0).max(10),
+  assessmentScore: z.number().min(0).max(10),
+  profileQualityScore: z.number().min(0).max(10),
+  spotlightPerformanceScore: z.number().min(0),
 });
 
-export const singleScoreSchema = Joi.object({
-  score: Joi.number().min(0).max(10).required(),
+export const singleScoreSchema = z.object({
+  score: z.number().min(0).max(10),
 });
+
+// Inferred TypeScript types — no need to write interfaces separately
+export type BaseScoreInput = z.infer<typeof baseScoreSchema>;
+export type SingleScoreInput = z.infer<typeof singleScoreSchema>;

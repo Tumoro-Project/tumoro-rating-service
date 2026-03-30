@@ -26,15 +26,15 @@ function convertAssessmentScore(score: number): number {
 }
 
 export function calculateBaseScore(inputScores: BaseScoreInput): number {
-    const convertedInterviewScore = convertInterviewScore(inputScores.interviewScore);
-    const convertedAssessmentScore = convertAssessmentScore(inputScores.assessmentScore);
+    const convertedInterviewScore = convertInterviewScore(inputScores.interviewScore ?? 0);
+    const convertedAssessmentScore = convertAssessmentScore(inputScores.assessmentScore ?? 0);
 
     const baseScore =
         convertedInterviewScore +
         convertedAssessmentScore +
-        inputScores.familyTreeScore +
-        inputScores.profileQualityScore +
-        inputScores.spotlightPerformanceScore;
+        (inputScores.familyTreeScore ?? 0) +
+        (inputScores.profileQualityScore ?? 0) +
+        (inputScores.spotlightPerformanceScore ?? 0);
 
     return baseScore;
 }

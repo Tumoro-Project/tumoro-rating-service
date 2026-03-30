@@ -1,15 +1,19 @@
 
 import { Request, Response, NextFunction } from 'express';
-import Joi from 'joi';
+import { ZodSchema, ZodError } from 'zod';
 
-export const validate = (schema: Joi.ObjectSchema) => {
+export const validate = (schema: ZodSchema) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    const { error } = schema.validate(req.body);
-    if (error) {
+    const result = schema.safeParse(req.body);
+    if (!result.success) {
+      const { fieldErrors } = (result.error as ZodError).flatten();
       return res.status(400).json({
-        message: error.details[0].message,
+        message: 'Validation failed',
+        errors: fieldErrors,
       });
     }
+    // Attach parsed (and coerced) data back to req.body
+    req.body = result.data;
     next();
   };
 };

@@ -1,158 +1,120 @@
-import { Request, Response } from "express";
-import { RatingService } from "../services/rating.service";
-import { BaseScoreInput } from "../models/IDataModels";
-import {
-  determineKFactor,
-  calculateBaseScore,
-} from "../utilities/rating.helpers";
+import { Request, Response } from 'express';
+import { RatingService } from '../services/rating.service';
+import { BaseScoreInput } from '../models/IDataModels';
 
 const ratingService = new RatingService();
 
 export class RatingController {
   /**
-   * @description Get the rating of a talent with a given ID.
-   * @param {Request} req The request object.
-   * @param {Response} res The response object.
+   * GET /v1/talent/:talentId/rating
+   * Returns current rating state, optionally including full history.
    */
-  public getTalentRating(req: Request, res: Response): void {
-    const { talentId } = req.params;
-    const { includeHistory } = req.query;
+  public async getTalentRating(req: Request, res: Response): Promise<void> {
+    try {
+      const talentId = req.params.talentId as string;
+      const talentState = await ratingService.getTalentState(talentId);
 
-    const talentState = ratingService.getTalentState(talentId);
-
-    if (includeHistory === "true") {
-      const ratingHistory = ratingService.getRatingHistory(talentId);
-      res.status(200).json({ ...talentState, ratingHistory });
-    } else {
-      res.status(200).json(talentState);
+      if (req.query.includeHistory === 'true') {
+        const ratingHistory = await ratingService.getRatingHistory(talentId);
+        res.status(200).json({ ...talentState, ratingHistory });
+      } else {
+        res.status(200).json(talentState);
+      }
+    } catch (err) {
+      console.error('getTalentRating error:', err);
+      res.status(500).json({ message: 'Internal server error' });
     }
   }
 
   /**
-   * @description Update the rating of a talent with a given ID.
-   * @param {Request} req The request object.
-   * @param {Response} res The response object.
+   * POST /v1/ratings/update/:talentId
+   * Updates all score components at once.
    */
-  public updateTalentRating(req: Request, res: Response): void {
-    const { talentId } = req.params;
-    const inputScores: BaseScoreInput = req.body;
+  public async updateTalentRating(req: Request, res: Response): Promise<void> {
+    try {
+      const talentId = req.params.talentId as string;
+      const inputScores: BaseScoreInput = req.body;
 
-    // Basic validation
-    if (!inputScores || typeof inputScores !== "object") {
-      res.status(400).json({ message: "Invalid request body" });
-      return;
+      const newTalentState = await ratingService.updateTalentRating(talentId, inputScores);
+      res.status(200).json(newTalentState);
+    } catch (err) {
+      console.error('updateTalentRating error:', err);
+      res.status(500).json({ message: 'Internal server error' });
     }
-    const previousRating = ratingService.getTalentState(talentId);
-
-    const newKFactor = determineKFactor(previousRating.engagementCount + 1);
-    const newBaseScore = calculateBaseScore(inputScores);
-
-    console.log("Previous Rating:", previousRating);
-    console.log("Input Scores:", inputScores);
-    console.log("New K-Factor:", newKFactor);
-    console.log("New Engagement Count:", previousRating.engagementCount + 1);
-    console.log("New Base Score:", newBaseScore);
-
-    // const newTalentState = ratingService.updateTalentRating(
-    //   talentId,
-    //   inputScores
-    // );
-    // res.status(200).json(newTalentState);
   }
 
   /**
-   * @description Update the interview score of a talent with a given ID.
-   * @param {Request} req The request object.
-   * @param {Response} res The response object.
+   * POST /v1/ratings/update/:talentId/interview-score
    */
-  public updateInterviewScore(req: Request, res: Response): void {
-    const { talentId } = req.params;
-    const { score } = req.body;
-
-    if (typeof score !== "number") {
-      res.status(400).json({ message: "Invalid score" });
-      return;
+  public async updateInterviewScore(req: Request, res: Response): Promise<void> {
+    try {
+      const talentId = req.params.talentId as string;
+      const { score } = req.body;
+      const newTalentState = await ratingService.updateInterviewScore(talentId, score);
+      res.status(200).json(newTalentState);
+    } catch (err) {
+      console.error('updateInterviewScore error:', err);
+      res.status(500).json({ message: 'Internal server error' });
     }
-
-    const newTalentState = ratingService.updateInterviewScore(talentId, score);
-    res.status(200).json(newTalentState);
   }
 
   /**
-   * @description Update the family tree score of a talent with a given ID.
-   * @param {Request} req The request object.
-   * @param {Response} res The response object.
+   * POST /v1/ratings/update/:talentId/family-tree-score
    */
-  public updateFamilyTreeScore(req: Request, res: Response): void {
-    const { talentId } = req.params;
-    const { score } = req.body;
-
-    if (typeof score !== "number") {
-      res.status(400).json({ message: "Invalid score" });
-      return;
+  public async updateFamilyTreeScore(req: Request, res: Response): Promise<void> {
+    try {
+      const talentId = req.params.talentId as string;
+      const { score } = req.body;
+      const newTalentState = await ratingService.updateFamilyTreeScore(talentId, score);
+      res.status(200).json(newTalentState);
+    } catch (err) {
+      console.error('updateFamilyTreeScore error:', err);
+      res.status(500).json({ message: 'Internal server error' });
     }
-
-    const newTalentState = ratingService.updateFamilyTreeScore(talentId, score);
-    res.status(200).json(newTalentState);
   }
 
   /**
-   * @description Update the assessment score of a talent with a given ID.
-   * @param {Request} req The request object.
-   * @param {Response} res The response object.
+   * POST /v1/ratings/update/:talentId/assessment-score
    */
-  public updateAssessmentScore(req: Request, res: Response): void {
-    const { talentId } = req.params;
-    const { score } = req.body;
-
-    if (typeof score !== "number") {
-      res.status(400).json({ message: "Invalid score" });
-      return;
+  public async updateAssessmentScore(req: Request, res: Response): Promise<void> {
+    try {
+      const talentId = req.params.talentId as string;
+      const { score } = req.body;
+      const newTalentState = await ratingService.updateAssessmentScore(talentId, score);
+      res.status(200).json(newTalentState);
+    } catch (err) {
+      console.error('updateAssessmentScore error:', err);
+      res.status(500).json({ message: 'Internal server error' });
     }
-
-    const newTalentState = ratingService.updateAssessmentScore(talentId, score);
-    res.status(200).json(newTalentState);
   }
 
   /**
-   * @description Update the profile quality score of a talent with a given ID.
-   * @param {Request} req The request object.
-   * @param {Response} res The response object.
+   * POST /v1/ratings/update/:talentId/profile-quality-score
    */
-  public updateProfileQualityScore(req: Request, res: Response): void {
-    const { talentId } = req.params;
-    const { score } = req.body;
-
-    if (typeof score !== "number") {
-      res.status(400).json({ message: "Invalid score" });
-      return;
+  public async updateProfileQualityScore(req: Request, res: Response): Promise<void> {
+    try {
+      const talentId = req.params.talentId as string;
+      const { score } = req.body;
+      const newTalentState = await ratingService.updateProfileQualityScore(talentId, score);
+      res.status(200).json(newTalentState);
+    } catch (err) {
+      console.error('updateProfileQualityScore error:', err);
+      res.status(500).json({ message: 'Internal server error' });
     }
-
-    const newTalentState = ratingService.updateProfileQualityScore(
-      talentId,
-      score
-    );
-    res.status(200).json(newTalentState);
   }
 
   /**
-   * @description Update the spotlight performance score of a talent with a given ID.
-   * @param {Request} req The request object.
-   * @param {Response} res The response object.
+   * POST /v1/ratings/update/:talentId/spotlight-performance-score
    */
-  public updateSpotlightPerformanceScore(req: Request, res: Response): void {
-    const { talentId } = req.params;
-    const { score } = req.body;
-
-    if (typeof score !== "number") {
-      res.status(400).json({ message: "Invalid score" });
-      return;
+  public async updateSpotlightPerformanceScore(req: Request, res: Response): Promise<void> {
+    try {
+      const talentId = req.params.talentId as string;
+      const { score } = req.body;
+      const newTalentState = await ratingService.updateSpotlightPerformanceScore(talentId, score);
+      res.status(200).json(newTalentState);
+    } catch (err) {
+      console.error('updateSpotlightPerformanceScore error:', err);
+      res.status(500).json({ message: 'Internal server error' });
     }
-
-    const newTalentState = ratingService.updateSpotlightPerformanceScore(
-      talentId,
-      score
-    );
-    res.status(200).json(newTalentState);
   }
 }

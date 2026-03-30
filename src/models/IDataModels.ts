@@ -1,9 +1,9 @@
 export interface BaseScoreInput {
-  interviewScore: number;
-  familyTreeScore: number;
-  assessmentScore: number;
-  profileQualityScore: number;
-  spotlightPerformanceScore: number;
+  interviewScore?: number;
+  familyTreeScore?: number;
+  assessmentScore?: number;
+  profileQualityScore?: number;
+  spotlightPerformanceScore?: number;
 }
 
 export interface TalentState {
