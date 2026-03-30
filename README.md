@@ -47,8 +47,13 @@ NODE_ENV=development
 DATABASE_URL=your_postgres_connection_string
 
 # Authentication
-JWT_SECRET=your_jwt_secret
-SERVICE_SECRET=your_service_to_service_secret
+
+The service uses two types of authentication:
+
+1.  **Talent/User Authentication:** Uses standard `Bearer <JWT>` tokens. Required for `/v1/talent` and standard rating endpoints.
+2.  **Internal Service Authentication:** Used for `/internal` routes and service-to-service updates. It supports two formats:
+    *   **Shared Secret:** `Authorization: Service <SERVICE_SECRET>`
+    *   **Service JWT:** `Authorization: Bearer <JWT>` (where the payload `type` is `service`).
 ```
 
 ### Running the Service
@@ -114,23 +119,53 @@ Update a specific score component for a talent. Each endpoint expects a `SingleS
 *   **Request Body:** `SingleScoreInput` object (JSON).
 *   **Response:** `TalentState` object.
 
-### 4. Event-Driven Updates (Internal)
+### 4. Internal Webhooks (Event System)
 
-These endpoints are used by other microservices to trigger rating updates via activity events. These routes require `SERVICE_SECRET` authentication.
+The Rating Service consumes activity events from other microservices to automatically trigger rating updates. These are essentially "webhooks" that your service calls whenever a relevant talent activity occurs.
 
-*   **POST** `/internal/events`: Emit a new activity event (e.g., `interview.completed`).
-*   **POST** `/internal/events/:eventId/retry`: Retry a failed event.
+*   **Endpoint:** `POST /internal/events`
+*   **Authentication:** Requires Internal Service Authentication (see [Authentication](#authentication)).
+*   **Payload Schema:**
+    ```json
+    {
+      "talentId": "uuid-string",
+      "eventType": "domain.action",
+      "sourceService": "your-service-name",
+      "payload": {
+        "score": 8.5,
+        "metadata": { "optional": "context" }
+      }
+    }
+    ```
+
+#### Supported Event Types & Mapping
+
+| Event Type (`eventType`) | Target Rating Component |
+| :--- | :--- |
+| `interview.completed` | `interviewScore` |
+| `assessment.completed` | `assessmentScore` |
+| `profile.updated` | `profileQualityScore` |
+| `spotlight.posted` | `spotlightPerformanceScore` |
+| `family_tree.updated` | `familyTreeScore` |
+
+#### Event Management Endpoints
+
 *   **GET** `/internal/events/:talentId`: Retrieve activity event history for a talent.
-*   **GET** `/internal/events/failed`: Retrieve all failed events.
+*   **GET** `/internal/events/failed`: Retrieve all failed events (Admin only).
+*   **POST** `/internal/events/:eventId/retry`: Retry a failed event.
 
-**Internal Event Payload Example:**
-```json
-{
-  "talentId": "user-uuid",
-  "eventType": "interview.completed",
-  "sourceService": "tumoro-interview-schedule",
-  "payload": { "score": 8.5 }
-}
+#### Webhook Example (using curl)
+
+```bash
+curl -X POST "http://localhost:3002/internal/events" \
+     -H "Authorization: Service your_service_secret" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "talentId": "talent123",
+           "eventType": "interview.completed",
+           "sourceService": "tumoro-interview-service",
+           "payload": { "score": 9 }
+         }'
 ```
 
 ## Data Models
