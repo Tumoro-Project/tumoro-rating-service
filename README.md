@@ -194,7 +194,25 @@ interface SingleScoreInput {
 
 ## Rating Calculation Logic
 
-The overall rating is derived from a sum of `profileQualityScore`, `interviewScore`, `assessmentScore`, `familyTreeScore`, and `spotlightPerformanceScore`. The `interviewScore` and `assessmentScore` are first converted to a signed value (e.g., -30 to +30 for interview, -25 to +25 for assessment) based on specific rules outlined in the `src/utilities/rating.helpers.ts` file. The `profileQualityScore`, `familyTreeScore`, and `spotlightPerformanceScore` are used directly. A `kFactor` is then applied to the aggregated base score to determine the final rating adjustment.
+The overall rating is derived from a sum of base scores and adjustments applied via a `kFactor`.
+
+**Initial Setup:**
+The default overall rating is **400**. This happens because the default scores are set to:
+*   Profile Completion: 100
+*   Interview: 100
+*   Skill Assessment: 100
+*   Spotlight Engagement: 100
+*   Family Tree: 0
+
+**Score Conversions:**
+When a new score is received, it undergoes specific conversions before being applied:
+*   **Interview and Assessment Scores:** These are converted to signed (+/-) adjustments.
+    *   For **Interviews (out of 10)**: A score of 3 evaluates to a 0 adjustment. Scores below 3 become negative (down to -30 for a score of 0/10), and scores above 3 become positive (up to +30 for a score of 10/10).
+    *   For **Assessments (out of 10)**: Similar logic applies, but the bounds are scaled to -25 to +25 instead of 30.
+*   **Other Scores:** Profile Completion (Quality), Family Tree Score, and Spotlight Engagement are used directly and not converted into (+/-) adjustments.
+
+**Final Calculation:**
+The base score adjustment is multiplied by the `kFactor` and then added to the previous overall rating to determine the new rating. Finally, this new entry is appended to the user's rating history.
 
 ## Quickstart Integration Guide
 
