@@ -1,21 +1,19 @@
-import { Router, Request, Response, NextFunction } from 'express';
-import { EventController } from '../controllers/event.controller';
-import { authenticateService } from '../middleware/auth.middleware';
-import { authenticate, requireRole } from '../middleware/auth.middleware';
-import { UserRole } from '../types';
-
-const router = Router();
-const eventController = new EventController();
-
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const event_controller_1 = require("../controllers/event.controller");
+const auth_middleware_1 = require("../middleware/auth.middleware");
+const auth_middleware_2 = require("../middleware/auth.middleware");
+const types_1 = require("../types");
+const router = (0, express_1.Router)();
+const eventController = new event_controller_1.EventController();
 /**
  * All /internal routes are protected by service-to-service authentication.
  * Only trusted microservices (using SERVICE_SECRET) can call these.
  *
  * Admins can also access read-only routes (getEventHistory, getFailedEvents).
  */
-
 // ─── Write: Service auth only ─────────────────────────────────────────────
-
 /**
  * @swagger
  * /internal/events:
@@ -41,10 +39,7 @@ const eventController = new EventController();
  *                 message: { type: 'string' }
  *                 eventId: { type: 'string' }
  */
-router.post('/internal/events', authenticateService, (req: Request, res: Response) =>
-    eventController.receiveEvent(req, res)
-);
-
+router.post('/internal/events', auth_middleware_1.authenticateService, (req, res) => eventController.receiveEvent(req, res));
 /**
  * @swagger
  * /internal/events/{eventId}/retry:
@@ -62,12 +57,8 @@ router.post('/internal/events', authenticateService, (req: Request, res: Respons
  *       200:
  *         description: Event retry initiated.
  */
-router.post('/internal/events/:eventId/retry', authenticateService, (req: Request, res: Response) =>
-    eventController.retryEvent(req, res)
-);
-
+router.post('/internal/events/:eventId/retry', auth_middleware_1.authenticateService, (req, res) => eventController.retryEvent(req, res));
 // ─── Read: Admin user OR service auth ────────────────────────────────────
-
 /**
  * @swagger
  * /internal/events/{talentId}:
@@ -91,20 +82,13 @@ router.post('/internal/events/:eventId/retry', authenticateService, (req: Reques
  *               items:
  *                 $ref: '#/components/schemas/ActivityEvent'
  */
-router.get(
-    '/internal/events/:talentId',
-    (req: Request, res: Response, next: NextFunction) => {
-        const authHeader = req.headers.authorization || '';
-        if (authHeader.startsWith('Service ')) {
-            return authenticateService(req, res, next);
-        }
-        authenticate(req as any, res, () =>
-            requireRole(UserRole.ADMIN)(req as any, res, next)
-        );
-    },
-    (req: Request, res: Response) => eventController.getEventHistory(req, res)
-);
-
+router.get('/internal/events/:talentId', (req, res, next) => {
+    const authHeader = req.headers.authorization || '';
+    if (authHeader.startsWith('Service ')) {
+        return (0, auth_middleware_1.authenticateService)(req, res, next);
+    }
+    (0, auth_middleware_2.authenticate)(req, res, () => (0, auth_middleware_2.requireRole)(types_1.UserRole.ADMIN)(req, res, next));
+}, (req, res) => eventController.getEventHistory(req, res));
 /**
  * @swagger
  * /internal/events/failed:
@@ -122,18 +106,11 @@ router.get(
  *               items:
  *                 $ref: '#/components/schemas/ActivityEvent'
  */
-router.get(
-    '/internal/events/failed',
-    (req: Request, res: Response, next: NextFunction) => {
-        const authHeader = req.headers.authorization || '';
-        if (authHeader.startsWith('Service ')) {
-            return authenticateService(req, res, next);
-        }
-        authenticate(req as any, res, () =>
-            requireRole(UserRole.ADMIN)(req as any, res, next)
-        );
-    },
-    (req: Request, res: Response) => eventController.getFailedEvents(req, res)
-);
-
-export default router;
+router.get('/internal/events/failed', (req, res, next) => {
+    const authHeader = req.headers.authorization || '';
+    if (authHeader.startsWith('Service ')) {
+        return (0, auth_middleware_1.authenticateService)(req, res, next);
+    }
+    (0, auth_middleware_2.authenticate)(req, res, () => (0, auth_middleware_2.requireRole)(types_1.UserRole.ADMIN)(req, res, next));
+}, (req, res) => eventController.getFailedEvents(req, res));
+exports.default = router;
