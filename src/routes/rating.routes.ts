@@ -66,6 +66,7 @@ router.get(
  *     summary: Update talent rating (all scores)
  *     description: Update the full rating of a talent. Requires admin or reviewer role, or a trusted service call.
  *     security:
+ *       - serviceAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -104,6 +105,7 @@ router.post(
  *   post:
  *     summary: Update interview score
  *     security:
+ *       - serviceAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -138,6 +140,7 @@ router.post(
  *   post:
  *     summary: Update family tree score
  *     security:
+ *       - serviceAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -168,6 +171,7 @@ router.post(
  *   post:
  *     summary: Update assessment score
  *     security:
+ *       - serviceAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -198,6 +202,7 @@ router.post(
  *   post:
  *     summary: Update profile quality score
  *     security:
+ *       - serviceAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -228,6 +233,7 @@ router.post(
  *   post:
  *     summary: Update spotlight performance score
  *     security:
+ *       - serviceAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path

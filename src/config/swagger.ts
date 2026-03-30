@@ -15,6 +15,20 @@ const swaggerDefinition = {
     },
   ],
   components: {
+    securitySchemes: {
+      bearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'Standard User JWT (type: access)',
+      },
+      serviceAuth: {
+        type: 'apiKey',
+        in: 'header',
+        name: 'Authorization',
+        description: 'Service Secret (Format: "Service <SECRET>") or Service JWT (Format: "Bearer <JWT>")',
+      },
+    },
     schemas: {
       BaseScoreInput: {
         type: 'object',
