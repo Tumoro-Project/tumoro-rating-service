@@ -20,7 +20,7 @@ app.use('/api-docs', swagger_ui_express_1.default.serve, swagger_ui_express_1.de
 app.use(rating_routes_1.default);
 app.use(event_routes_1.default);
 // Health check
-app.get('/health', (_req, res) => {
+app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok', service: 'tumoro-rating-service' });
 });
 // Boot: connect to DB then start server

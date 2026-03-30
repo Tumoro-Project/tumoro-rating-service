@@ -21,7 +21,7 @@ app.use(ratingRoutes);
 app.use(eventRoutes);
 
 // Health check
-app.get('/health', (_req, res) => {
+app.get('/health', (req: express.Request, res: express.Response) => {
     res.status(200).json({ status: 'ok', service: 'tumoro-rating-service' });
 });
 

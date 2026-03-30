@@ -41,7 +41,7 @@ function authenticate(req, res, next) {
         };
         next();
     }
-    catch (_a) {
+    catch {
         res.status(401).json({ error: 'Invalid or expired token' });
     }
 }
@@ -118,7 +118,7 @@ function authenticateService(req, res, next) {
         }
         res.status(401).json({ error: 'Invalid authorization format' });
     }
-    catch (_a) {
+    catch {
         res.status(401).json({ error: 'Service authentication failed' });
     }
 }

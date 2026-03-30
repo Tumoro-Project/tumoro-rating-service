@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.EventService = void 0;
 const database_1 = require("../config/database");
@@ -56,81 +47,73 @@ class EventService {
      * 3. Marks it as processed (or failed)
      * Returns the final event record.
      */
-    receiveEvent(dto) {
-        return __awaiter(this, void 0, void 0, function* () {
-            // 1. Insert event as pending
-            const insertResult = yield database_1.pool.query(`INSERT INTO activity_events
+    async receiveEvent(dto) {
+        // 1. Insert event as pending
+        const insertResult = await database_1.pool.query(`INSERT INTO activity_events
          (talent_id, event_type, source_service, payload, status)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING *`, [
-                dto.talentId,
-                dto.eventType,
-                dto.sourceService,
-                JSON.stringify(dto.payload),
-                events_1.EventStatus.PENDING,
-            ]);
-            const event = rowToEvent(insertResult.rows[0]);
-            // 2. Process immediately
-            try {
-                const scores = mapEventToScores(dto.eventType, dto.payload);
-                yield ratingService.updateTalentRating(dto.talentId, scores);
-                // 3a. Mark as processed
-                yield database_1.pool.query(`UPDATE activity_events
+            dto.talentId,
+            dto.eventType,
+            dto.sourceService,
+            JSON.stringify(dto.payload),
+            events_1.EventStatus.PENDING,
+        ]);
+        const event = rowToEvent(insertResult.rows[0]);
+        // 2. Process immediately
+        try {
+            const scores = mapEventToScores(dto.eventType, dto.payload);
+            await ratingService.updateTalentRating(dto.talentId, scores);
+            // 3a. Mark as processed
+            await database_1.pool.query(`UPDATE activity_events
             SET status = $1, processed_at = NOW()
           WHERE event_id = $2`, [events_1.EventStatus.PROCESSED, event.eventId]);
-                return Object.assign(Object.assign({}, event), { status: events_1.EventStatus.PROCESSED, processedAt: new Date() });
-            }
-            catch (err) {
-                const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-                // 3b. Mark as failed with error detail
-                yield database_1.pool.query(`UPDATE activity_events
+            return { ...event, status: events_1.EventStatus.PROCESSED, processedAt: new Date() };
+        }
+        catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+            // 3b. Mark as failed with error detail
+            await database_1.pool.query(`UPDATE activity_events
             SET status = $1, error_message = $2, processed_at = NOW()
           WHERE event_id = $3`, [events_1.EventStatus.FAILED, errorMessage, event.eventId]);
-                throw err; // re-throw so the controller returns 500
-            }
-        });
+            throw err; // re-throw so the controller returns 500
+        }
     }
     /**
      * Returns the full event log for a talent, newest first.
      */
-    getEventHistory(talentId) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const { rows } = yield database_1.pool.query(`SELECT * FROM activity_events
+    async getEventHistory(talentId) {
+        const { rows } = await database_1.pool.query(`SELECT * FROM activity_events
         WHERE talent_id = $1
         ORDER BY created_at DESC`, [talentId]);
-            return rows.map(rowToEvent);
-        });
+        return rows.map(rowToEvent);
     }
     /**
      * Returns all failed events across all talents (useful for ops/debugging).
      */
-    getFailedEvents() {
-        return __awaiter(this, void 0, void 0, function* () {
-            const { rows } = yield database_1.pool.query(`SELECT * FROM activity_events
+    async getFailedEvents() {
+        const { rows } = await database_1.pool.query(`SELECT * FROM activity_events
         WHERE status = $1
         ORDER BY created_at DESC`, [events_1.EventStatus.FAILED]);
-            return rows.map(rowToEvent);
-        });
+        return rows.map(rowToEvent);
     }
     /**
      * Retry a previously failed event by its ID.
      */
-    retryEvent(eventId) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const { rows } = yield database_1.pool.query(`SELECT * FROM activity_events WHERE event_id = $1`, [eventId]);
-            if (!rows.length)
-                throw new Error(`Event ${eventId} not found`);
-            const event = rowToEvent(rows[0]);
-            if (event.status !== events_1.EventStatus.FAILED) {
-                throw new Error(`Event ${eventId} is not in a failed state (status: ${event.status})`);
-            }
-            // Re-process
-            return this.receiveEvent({
-                talentId: event.talentId,
-                eventType: event.eventType,
-                sourceService: event.sourceService,
-                payload: event.payload,
-            });
+    async retryEvent(eventId) {
+        const { rows } = await database_1.pool.query(`SELECT * FROM activity_events WHERE event_id = $1`, [eventId]);
+        if (!rows.length)
+            throw new Error(`Event ${eventId} not found`);
+        const event = rowToEvent(rows[0]);
+        if (event.status !== events_1.EventStatus.FAILED) {
+            throw new Error(`Event ${eventId} is not in a failed state (status: ${event.status})`);
+        }
+        // Re-process
+        return this.receiveEvent({
+            talentId: event.talentId,
+            eventType: event.eventType,
+            sourceService: event.sourceService,
+            payload: event.payload,
         });
     }
 }

@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RatingService = void 0;
 const rating_helpers_1 = require("../utilities/rating.helpers");
@@ -82,113 +73,95 @@ class RatingService {
      * Fetches the talent's current state from the DB.
      * If the talent doesn't exist, creates a default record (UPSERT).
      */
-    getTalentState(talentId) {
-        return __awaiter(this, void 0, void 0, function* () {
-            // UPSERT: insert default row if not present, then return current row
-            const { rows } = yield database_1.pool.query(`INSERT INTO talent_states (
+    async getTalentState(talentId) {
+        // UPSERT: insert default row if not present, then return current row
+        const { rows } = await database_1.pool.query(`INSERT INTO talent_states (
           talent_id, current_rating, current_k_factor, engagement_count,
           interview_score, family_tree_score, assessment_score,
           profile_quality_score, spotlight_performance_score, last_updated
        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
        ON CONFLICT (talent_id) DO NOTHING
        RETURNING *`, [
-                talentId,
-                DEFAULT_RATING,
-                1.0,
-                0,
-                DEFAULT_SCORES.interviewScore,
-                DEFAULT_SCORES.familyTreeScore,
-                DEFAULT_SCORES.assessmentScore,
-                DEFAULT_SCORES.profileQualityScore,
-                DEFAULT_SCORES.spotlightPerformanceScore,
-            ]);
-            if (rows.length > 0)
-                return this.rowToTalentState(rows[0]);
-            // Row already existed — fetch it
-            const existing = yield database_1.pool.query(`SELECT * FROM talent_states WHERE talent_id = $1`, [talentId]);
-            return this.rowToTalentState(existing.rows[0]);
-        });
+            talentId,
+            DEFAULT_RATING,
+            1.0,
+            0,
+            DEFAULT_SCORES.interviewScore,
+            DEFAULT_SCORES.familyTreeScore,
+            DEFAULT_SCORES.assessmentScore,
+            DEFAULT_SCORES.profileQualityScore,
+            DEFAULT_SCORES.spotlightPerformanceScore,
+        ]);
+        if (rows.length > 0)
+            return this.rowToTalentState(rows[0]);
+        // Row already existed — fetch it
+        const existing = await database_1.pool.query(`SELECT * FROM talent_states WHERE talent_id = $1`, [talentId]);
+        return this.rowToTalentState(existing.rows[0]);
     }
     /**
      * Returns the full rating history for a talent, newest first.
      */
-    getRatingHistory(talentId) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const { rows } = yield database_1.pool.query(`SELECT * FROM rating_entries WHERE talent_id = $1 ORDER BY timestamp DESC`, [talentId]);
-            return rows.map((r) => this.rowToRatingEntry(r));
-        });
+    async getRatingHistory(talentId) {
+        const { rows } = await database_1.pool.query(`SELECT * FROM rating_entries WHERE talent_id = $1 ORDER BY timestamp DESC`, [talentId]);
+        return rows.map((r) => this.rowToRatingEntry(r));
     }
     /**
      * Updates all score components at once.
      */
-    updateTalentRating(talentId, inputScores) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return this.recalculateRating(talentId, inputScores);
-        });
+    async updateTalentRating(talentId, inputScores) {
+        return this.recalculateRating(talentId, inputScores);
     }
-    updateInterviewScore(talentId, score) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return this.recalculateRating(talentId, { interviewScore: score });
-        });
+    async updateInterviewScore(talentId, score) {
+        return this.recalculateRating(talentId, { interviewScore: score });
     }
-    updateFamilyTreeScore(talentId, score) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return this.recalculateRating(talentId, { familyTreeScore: score });
-        });
+    async updateFamilyTreeScore(talentId, score) {
+        return this.recalculateRating(talentId, { familyTreeScore: score });
     }
-    updateAssessmentScore(talentId, score) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return this.recalculateRating(talentId, { assessmentScore: score });
-        });
+    async updateAssessmentScore(talentId, score) {
+        return this.recalculateRating(talentId, { assessmentScore: score });
     }
-    updateProfileQualityScore(talentId, score) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return this.recalculateRating(talentId, { profileQualityScore: score });
-        });
+    async updateProfileQualityScore(talentId, score) {
+        return this.recalculateRating(talentId, { profileQualityScore: score });
     }
-    updateSpotlightPerformanceScore(talentId, score) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return this.recalculateRating(talentId, { spotlightPerformanceScore: score });
-        });
+    async updateSpotlightPerformanceScore(talentId, score) {
+        return this.recalculateRating(talentId, { spotlightPerformanceScore: score });
     }
     // ─── Core Calculation ─────────────────────────────────────────────────────
-    recalculateRating(talentId, inputScores) {
-        return __awaiter(this, void 0, void 0, function* () {
-            var _a, _b, _c, _d, _e;
-            const client = yield database_1.pool.connect();
-            try {
-                yield client.query('BEGIN');
-                const current = yield this.getTalentState(talentId);
-                const prevScores = current.lastInputScores;
-                const kFactor = (0, rating_helpers_1.determineKFactor)(current.engagementCount);
-                // Convert into signed deltas ONLY if the score is provided
-                const interviewDelta = inputScores.interviewScore !== undefined
-                    ? this.convertToSigned(inputScores.interviewScore, 30) * kFactor
-                    : 0;
-                const assessmentDelta = inputScores.assessmentScore !== undefined
-                    ? this.convertToSigned(inputScores.assessmentScore, 25) * kFactor
-                    : 0;
-                const spotlightDelta = inputScores.spotlightPerformanceScore !== undefined
-                    ? (inputScores.spotlightPerformanceScore || 0) * kFactor
-                    : 0;
-                const profileDelta = inputScores.profileQualityScore !== undefined
-                    ? (inputScores.profileQualityScore || 0) * kFactor
-                    : 0;
-                const familyDelta = inputScores.familyTreeScore !== undefined
-                    ? (inputScores.familyTreeScore || 0) * kFactor
-                    : 0;
-                // Accumulate on top of previous scores
-                const newScores = {
-                    interviewScore: ((_a = prevScores.interviewScore) !== null && _a !== void 0 ? _a : 0) + interviewDelta,
-                    assessmentScore: ((_b = prevScores.assessmentScore) !== null && _b !== void 0 ? _b : 0) + assessmentDelta,
-                    spotlightPerformanceScore: ((_c = prevScores.spotlightPerformanceScore) !== null && _c !== void 0 ? _c : 0) + spotlightDelta,
-                    profileQualityScore: ((_d = prevScores.profileQualityScore) !== null && _d !== void 0 ? _d : 0) + profileDelta,
-                    familyTreeScore: ((_e = prevScores.familyTreeScore) !== null && _e !== void 0 ? _e : 0) + familyDelta,
-                };
-                const newRating = this.getRatingTotal(newScores);
-                const newEngagementCount = current.engagementCount + 1;
-                // 1. Update talent_states row
-                yield client.query(`UPDATE talent_states SET
+    async recalculateRating(talentId, inputScores) {
+        const client = await database_1.pool.connect();
+        try {
+            await client.query('BEGIN');
+            const current = await this.getTalentState(talentId);
+            const prevScores = current.lastInputScores;
+            const kFactor = (0, rating_helpers_1.determineKFactor)(current.engagementCount);
+            // Convert into signed deltas ONLY if the score is provided
+            const interviewDelta = inputScores.interviewScore !== undefined
+                ? this.convertToSigned(inputScores.interviewScore, 30) * kFactor
+                : 0;
+            const assessmentDelta = inputScores.assessmentScore !== undefined
+                ? this.convertToSigned(inputScores.assessmentScore, 25) * kFactor
+                : 0;
+            const spotlightDelta = inputScores.spotlightPerformanceScore !== undefined
+                ? (inputScores.spotlightPerformanceScore || 0) * kFactor
+                : 0;
+            const profileDelta = inputScores.profileQualityScore !== undefined
+                ? (inputScores.profileQualityScore || 0) * kFactor
+                : 0;
+            const familyDelta = inputScores.familyTreeScore !== undefined
+                ? (inputScores.familyTreeScore || 0) * kFactor
+                : 0;
+            // Accumulate on top of previous scores
+            const newScores = {
+                interviewScore: (prevScores.interviewScore ?? 0) + interviewDelta,
+                assessmentScore: (prevScores.assessmentScore ?? 0) + assessmentDelta,
+                spotlightPerformanceScore: (prevScores.spotlightPerformanceScore ?? 0) + spotlightDelta,
+                profileQualityScore: (prevScores.profileQualityScore ?? 0) + profileDelta,
+                familyTreeScore: (prevScores.familyTreeScore ?? 0) + familyDelta,
+            };
+            const newRating = this.getRatingTotal(newScores);
+            const newEngagementCount = current.engagementCount + 1;
+            // 1. Update talent_states row
+            await client.query(`UPDATE talent_states SET
             current_rating              = $1,
             current_k_factor            = $2,
             engagement_count            = $3,
@@ -199,58 +172,57 @@ class RatingService {
             spotlight_performance_score = $8,
             last_updated                = NOW()
           WHERE talent_id = $9`, [
-                    newRating,
-                    kFactor,
-                    newEngagementCount,
-                    newScores.interviewScore,
-                    newScores.familyTreeScore,
-                    newScores.assessmentScore,
-                    newScores.profileQualityScore,
-                    newScores.spotlightPerformanceScore,
-                    talentId,
-                ]);
-                // 2. Insert rating_entries audit row
-                yield client.query(`INSERT INTO rating_entries (
+                newRating,
+                kFactor,
+                newEngagementCount,
+                newScores.interviewScore,
+                newScores.familyTreeScore,
+                newScores.assessmentScore,
+                newScores.profileQualityScore,
+                newScores.spotlightPerformanceScore,
+                talentId,
+            ]);
+            // 2. Insert rating_entries audit row
+            await client.query(`INSERT INTO rating_entries (
             talent_id, previous_rating, new_rating, k_factor_used, new_engagement_count,
             input_interview_score, input_family_tree_score, input_assessment_score,
             input_profile_quality_score, input_spotlight_performance_score,
             current_interview_score, current_family_tree_score, current_assessment_score,
             current_profile_quality_score, current_spotlight_performance_score
           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`, [
-                    talentId,
-                    current.currentRating,
-                    newRating,
-                    kFactor,
-                    newEngagementCount,
-                    inputScores.interviewScore,
-                    inputScores.familyTreeScore,
-                    inputScores.assessmentScore,
-                    inputScores.profileQualityScore,
-                    inputScores.spotlightPerformanceScore,
-                    newScores.interviewScore,
-                    newScores.familyTreeScore,
-                    newScores.assessmentScore,
-                    newScores.profileQualityScore,
-                    newScores.spotlightPerformanceScore,
-                ]);
-                yield client.query('COMMIT');
-                return {
-                    talentId,
-                    currentRating: newRating,
-                    currentKFactor: kFactor,
-                    engagementCount: newEngagementCount,
-                    lastInputScores: newScores,
-                    lastUpdated: new Date(),
-                };
-            }
-            catch (err) {
-                yield client.query('ROLLBACK');
-                throw err;
-            }
-            finally {
-                client.release();
-            }
-        });
+                talentId,
+                current.currentRating,
+                newRating,
+                kFactor,
+                newEngagementCount,
+                inputScores.interviewScore,
+                inputScores.familyTreeScore,
+                inputScores.assessmentScore,
+                inputScores.profileQualityScore,
+                inputScores.spotlightPerformanceScore,
+                newScores.interviewScore,
+                newScores.familyTreeScore,
+                newScores.assessmentScore,
+                newScores.profileQualityScore,
+                newScores.spotlightPerformanceScore,
+            ]);
+            await client.query('COMMIT');
+            return {
+                talentId,
+                currentRating: newRating,
+                currentKFactor: kFactor,
+                engagementCount: newEngagementCount,
+                lastInputScores: newScores,
+                lastUpdated: new Date(),
+            };
+        }
+        catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+        }
+        finally {
+            client.release();
+        }
     }
 }
 exports.RatingService = RatingService;

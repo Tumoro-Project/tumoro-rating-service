@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -38,12 +29,11 @@ exports.unpooledPool = new pg_1.Pool({
  * Tests the database connection and creates tables if they don't exist.
  * Uses the unpooled connection so schema changes aren't broken by a pooler.
  */
-function initDatabase() {
-    return __awaiter(this, void 0, void 0, function* () {
-        const client = yield exports.unpooledPool.connect();
-        try {
-            console.log('🔗 Connecting to Neon DB...');
-            yield client.query(`
+async function initDatabase() {
+    const client = await exports.unpooledPool.connect();
+    try {
+        console.log('🔗 Connecting to Neon DB...');
+        await client.query(`
       -- Stores the current rating state for each talent
       CREATE TABLE IF NOT EXISTS talent_states (
         talent_id                   VARCHAR(255)   PRIMARY KEY,
@@ -99,10 +89,9 @@ function initDatabase() {
       -- Index for quickly finding all failed events
       CREATE INDEX IF NOT EXISTS idx_activity_events_status ON activity_events(status);
     `);
-            console.log('✅ Connected to Neon DB. Tables verified/created successfully.');
-        }
-        finally {
-            client.release();
-        }
-    });
+        console.log('✅ Connected to Neon DB. Tables verified/created successfully.');
+    }
+    finally {
+        client.release();
+    }
 }

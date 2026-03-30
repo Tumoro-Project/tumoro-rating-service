@@ -28,14 +28,13 @@ function convertAssessmentScore(score) {
     }
 }
 function calculateBaseScore(inputScores) {
-    var _a, _b, _c, _d, _e;
-    const convertedInterviewScore = convertInterviewScore((_a = inputScores.interviewScore) !== null && _a !== void 0 ? _a : 0);
-    const convertedAssessmentScore = convertAssessmentScore((_b = inputScores.assessmentScore) !== null && _b !== void 0 ? _b : 0);
+    const convertedInterviewScore = convertInterviewScore(inputScores.interviewScore ?? 0);
+    const convertedAssessmentScore = convertAssessmentScore(inputScores.assessmentScore ?? 0);
     const baseScore = convertedInterviewScore +
         convertedAssessmentScore +
-        ((_c = inputScores.familyTreeScore) !== null && _c !== void 0 ? _c : 0) +
-        ((_d = inputScores.profileQualityScore) !== null && _d !== void 0 ? _d : 0) +
-        ((_e = inputScores.spotlightPerformanceScore) !== null && _e !== void 0 ? _e : 0);
+        (inputScores.familyTreeScore ?? 0) +
+        (inputScores.profileQualityScore ?? 0) +
+        (inputScores.spotlightPerformanceScore ?? 0);
     return baseScore;
 }
 function determineKFactor(engagementCount) {
