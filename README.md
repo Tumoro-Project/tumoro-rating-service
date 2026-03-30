@@ -58,11 +58,22 @@ The service uses two types of authentication:
 
 ### Running the Service
 
-To start the development server:
-
+#### Development
+To start the development server (auto-reloads on changes):
 ```bash
 npm run dev
 ```
+
+#### Production
+To build and run the service for production:
+1.  Compile the TypeScript code:
+    ```bash
+    npm run build
+    ```
+2.  Start the compiled service:
+    ```bash
+    npm run start
+    ```
 
 The service will be running on `http://localhost:3002` (or the port specified in your `.env`).
 
