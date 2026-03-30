@@ -10,8 +10,12 @@ const swaggerDefinition = {
   },
   servers: [
     {
-      url: 'http://localhost:3000',
-      description: 'Development server',
+      url: 'https://tumoro-rating-service.onrender.com',
+      description: 'Production server (Render)',
+    },
+    {
+      url: 'http://localhost:3002',
+      description: 'Local development server',
     },
   ],
   components: {
