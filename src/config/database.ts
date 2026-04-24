@@ -86,6 +86,8 @@ export async function initDatabase(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_activity_events_talent_id ON activity_events(talent_id);
       -- Index for quickly finding all failed events
       CREATE INDEX IF NOT EXISTS idx_activity_events_status ON activity_events(status);
+      -- Index for weekly momentum calculation (7-day delta)
+      CREATE INDEX IF NOT EXISTS idx_rating_entries_talent_timestamp ON rating_entries(talent_id, timestamp DESC);
     `);
     console.log('✅ Connected to Neon DB. Tables verified/created successfully.');
   } finally {

@@ -106,6 +106,37 @@ class RatingService {
         return rows.map((r) => this.rowToRatingEntry(r));
     }
     /**
+     * Returns the fastest growing talent (Momentum) for the week.
+     * Momentum = (Rating Delta over 7 days) * (Engagement Count over 7 days) / K_factor
+     */
+    async getTrendingTalent(limit = 10) {
+        const { rows } = await database_1.pool.query(`WITH weekly_deltas AS (
+        SELECT 
+          ts.talent_id,
+          ts.current_rating,
+          ts.current_k_factor,
+          -- Get the oldest rating within the last 7 days for each user
+          FIRST_VALUE(re.new_rating) OVER (PARTITION BY ts.talent_id ORDER BY re.timestamp ASC) as start_week_rating,
+          -- Count engagements in the last 7 days
+          COUNT(*) OVER (PARTITION BY ts.talent_id) as weekly_engagements
+        FROM talent_states ts
+        JOIN rating_entries re ON re.talent_id = ts.talent_id
+        WHERE re.timestamp >= NOW() - INTERVAL '7 days'
+      )
+      SELECT DISTINCT
+        talent_id,
+        current_rating,
+        weekly_engagements,
+        (current_rating - start_week_rating) as rating_delta,
+        -- Momentum Score: (Delta * Engagements) / K_factor
+        -- We multiply by (1/K_factor) so Tier 3 (K=0.2) gets a 5x boost vs Tier 1 (K=1.0)
+        ((current_rating - start_week_rating) * weekly_engagements / current_k_factor) as momentum_score
+      FROM weekly_deltas
+      ORDER BY momentum_score DESC
+      LIMIT $1`, [limit]);
+        return rows;
+    }
+    /**
      * Updates all score components at once.
      */
     async updateTalentRating(talentId, inputScores) {

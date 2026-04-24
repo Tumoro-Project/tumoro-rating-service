@@ -21,7 +21,7 @@ const eventController = new event_controller_1.EventController();
  *     summary: Receive activity event
  *     description: Called by other services to emit an activity event that triggers a rating update.
  *     security:
- *       - bearerAuth: []
+ *       - serviceAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -46,7 +46,7 @@ router.post('/internal/events', auth_middleware_1.authenticateService, (req, res
  *   post:
  *     summary: Retry a failed event
  *     security:
- *       - bearerAuth: []
+ *       - serviceAuth: []
  *     parameters:
  *       - in: path
  *         name: eventId
@@ -65,6 +65,7 @@ router.post('/internal/events/:eventId/retry', auth_middleware_1.authenticateSer
  *   get:
  *     summary: Get event history for a talent
  *     security:
+ *       - serviceAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -95,6 +96,7 @@ router.get('/internal/events/:talentId', (req, res, next) => {
  *   get:
  *     summary: Get all failed events
  *     security:
+ *       - serviceAuth: []
  *       - bearerAuth: []
  *     responses:
  *       200:

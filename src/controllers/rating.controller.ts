@@ -27,6 +27,21 @@ export class RatingController {
   }
 
   /**
+   * GET /v1/ratings/trending
+   * Returns the fastest growing talent based on momentum score.
+   */
+  public async getTrendingTalent(req: Request, res: Response): Promise<void> {
+    try {
+      const limit = req.query.limit ? Number(req.query.limit) : 10;
+      const trending = await ratingService.getTrendingTalent(limit);
+      res.status(200).json({ results: trending });
+    } catch (err) {
+      console.error('getTrendingTalent error:', err);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+
+  /**
    * POST /v1/ratings/update/:talentId
    * Updates all score components at once.
    */

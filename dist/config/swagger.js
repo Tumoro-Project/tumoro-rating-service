@@ -14,11 +14,29 @@ const swaggerDefinition = {
     },
     servers: [
         {
-            url: 'http://localhost:3000',
-            description: 'Development server',
+            url: 'https://tumoro-rating-service.onrender.com',
+            description: 'Production server (Render)',
+        },
+        {
+            url: 'http://localhost:3002',
+            description: 'Local development server',
         },
     ],
     components: {
+        securitySchemes: {
+            bearerAuth: {
+                type: 'http',
+                scheme: 'bearer',
+                bearerFormat: 'JWT',
+                description: 'Standard User JWT (type: access)',
+            },
+            serviceAuth: {
+                type: 'apiKey',
+                in: 'header',
+                name: 'Authorization',
+                description: 'Service Secret (Format: "Service <SECRET>") or Service JWT (Format: "Bearer <JWT>")',
+            },
+        },
         schemas: {
             BaseScoreInput: {
                 type: 'object',

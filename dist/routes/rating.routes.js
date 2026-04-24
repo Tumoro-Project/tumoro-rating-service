@@ -54,11 +54,23 @@ const canWriteRatingsOrService = [
 router.get('/v1/talent/:talentId/rating', auth_middleware_1.authenticate, ratingController.getTalentRating);
 /**
  * @swagger
+ * /v1/ratings/trending:
+ *   get:
+ *     summary: Get trending talent
+ *     description: Returns the fastest growing talent based on momentum score for the week.
+ *     responses:
+ *       200:
+ *         description: List of trending talent.
+ */
+router.get('/v1/ratings/trending', auth_middleware_1.authenticate, ratingController.getTrendingTalent);
+/**
+ * @swagger
  * /v1/ratings/update/{talentId}:
  *   post:
  *     summary: Update talent rating (all scores)
  *     description: Update the full rating of a talent. Requires admin or reviewer role, or a trusted service call.
  *     security:
+ *       - serviceAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -91,6 +103,7 @@ router.post('/v1/ratings/update/:talentId', ...canWriteRatingsOrService, (0, val
  *   post:
  *     summary: Update interview score
  *     security:
+ *       - serviceAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -119,6 +132,7 @@ router.post('/v1/ratings/update/:talentId/interview-score', ...canWriteRatingsOr
  *   post:
  *     summary: Update family tree score
  *     security:
+ *       - serviceAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -143,6 +157,7 @@ router.post('/v1/ratings/update/:talentId/family-tree-score', ...canWriteRatings
  *   post:
  *     summary: Update assessment score
  *     security:
+ *       - serviceAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -167,6 +182,7 @@ router.post('/v1/ratings/update/:talentId/assessment-score', ...canWriteRatingsO
  *   post:
  *     summary: Update profile quality score
  *     security:
+ *       - serviceAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -191,6 +207,7 @@ router.post('/v1/ratings/update/:talentId/profile-quality-score', ...canWriteRat
  *   post:
  *     summary: Update spotlight performance score
  *     security:
+ *       - serviceAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path

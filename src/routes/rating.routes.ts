@@ -61,6 +61,22 @@ router.get(
 
 /**
  * @swagger
+ * /v1/ratings/trending:
+ *   get:
+ *     summary: Get trending talent
+ *     description: Returns the fastest growing talent based on momentum score for the week.
+ *     responses:
+ *       200:
+ *         description: List of trending talent.
+ */
+router.get(
+    '/v1/ratings/trending',
+    authenticate,
+    ratingController.getTrendingTalent
+);
+
+/**
+ * @swagger
  * /v1/ratings/update/{talentId}:
  *   post:
  *     summary: Update talent rating (all scores)
