@@ -43,6 +43,7 @@ export async function initDatabase(): Promise<void> {
         assessment_score            NUMERIC(10, 4) NOT NULL DEFAULT 100,
         profile_quality_score       NUMERIC(10, 4) NOT NULL DEFAULT 100,
         spotlight_performance_score NUMERIC(10, 4) NOT NULL DEFAULT 100,
+        character_score             NUMERIC(10, 4) NOT NULL DEFAULT 0,
         last_updated                TIMESTAMPTZ    NOT NULL DEFAULT NOW()
       );
 
@@ -61,12 +62,20 @@ export async function initDatabase(): Promise<void> {
         input_assessment_score                NUMERIC(10, 4),
         input_profile_quality_score           NUMERIC(10, 4),
         input_spotlight_performance_score     NUMERIC(10, 4),
+        -- new character dimensions
+        input_integrity                       INTEGER,
+        input_consistency                     INTEGER,
+        input_investment_in_others            INTEGER,
+        input_long_term_thinking              INTEGER,
+        input_honesty                         INTEGER,
+        rater_relationship                    VARCHAR(50),
         -- accumulated scores after this change
         current_interview_score               NUMERIC(10, 4),
         current_family_tree_score             NUMERIC(10, 4),
         current_assessment_score              NUMERIC(10, 4),
         current_profile_quality_score         NUMERIC(10, 4),
-        current_spotlight_performance_score   NUMERIC(10, 4)
+        current_spotlight_performance_score   NUMERIC(10, 4),
+        current_character_score               NUMERIC(10, 4)
       );
 
       -- Event log: every activity from any service that affects ratings

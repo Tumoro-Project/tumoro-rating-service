@@ -4,6 +4,13 @@ export interface BaseScoreInput {
   assessmentScore?: number;
   profileQualityScore?: number;
   spotlightPerformanceScore?: number;
+  characterScore?: number;
+  integrity?: number;
+  consistency?: number;
+  investmentInOthers?: number;
+  longTermThinking?: number;
+  honesty?: number;
+  raterRelationship?: string;
 }
 
 export interface TalentState {
