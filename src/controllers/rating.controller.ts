@@ -132,4 +132,34 @@ export class RatingController {
       res.status(500).json({ message: 'Internal server error' });
     }
   }
+
+  /**
+   * GET /v1/talent/:talentId/character-breakdown
+   */
+  public async getCharacterBreakdown(req: Request, res: Response): Promise<void> {
+    try {
+      const breakdown = {
+        totalCount: 0,
+        publicScore: false,
+        averages: {
+          integrity: 0,
+          consistency: 0,
+          investmentInOthers: 0,
+          longTermThinking: 0,
+          honesty: 0,
+        },
+        raterRelationshipCounts: {
+          PROFESSIONAL: 0,
+          COLLEAGUE: 0,
+          COMMUNITY: 0,
+          MENTOR: 0,
+        },
+        hasCharacterMomentum: false,
+      };
+      res.status(200).json(breakdown);
+    } catch (err) {
+      console.error('getCharacterBreakdown error:', err);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  }
 }

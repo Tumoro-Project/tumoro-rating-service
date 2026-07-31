@@ -59,6 +59,11 @@ router.get(
     ratingController.getTalentRating
 );
 
+router.get(
+    '/v1/talent/:talentId/character-breakdown',
+    ratingController.getCharacterBreakdown
+);
+
 /**
  * @swagger
  * /v1/ratings/trending:
