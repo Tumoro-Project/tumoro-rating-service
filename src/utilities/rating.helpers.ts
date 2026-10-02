@@ -50,5 +50,5 @@ export function determineKFactor(engagementCount: number): number {
 }
 
 export function calculateNewRating(currentRating: number, baseScore: number, kFactor: number): number {
-    return currentRating + kFactor * baseScore;
+    return Number((currentRating + kFactor * baseScore).toFixed(2));
 }
