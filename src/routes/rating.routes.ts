@@ -24,6 +24,24 @@ const canWriteRatingsOrService = [
     },
 ];
 
+// Talents can update their own family tree score; admins, reviewers, and internal services can also update
+const canUpdateFamilyTreeOrService = [
+    (req: Request, res: Response, next: NextFunction) => {
+        const authHeader = req.headers.authorization || '';
+        if (authHeader.startsWith('Service ')) {
+            return authenticateService(req, res, next);
+        }
+        authenticate(req as any, res, () => {
+            const user = (req as any).user;
+            const talentId = req.params.talentId;
+            if (user?.userId === talentId || user?.role === UserRole.ADMIN || user?.role === UserRole.REVIEWER) {
+                return next();
+            }
+            res.status(403).json({ error: 'Forbidden: Insufficient permissions' });
+        });
+    },
+];
+
 /**
  * @swagger
  * /v1/talent/{talentId}/rating:
@@ -181,7 +199,7 @@ router.post(
  */
 router.post(
     '/v1/ratings/update/:talentId/family-tree-score',
-    ...canWriteRatingsOrService,
+    ...canUpdateFamilyTreeOrService,
     validate(singleScoreSchema),
     ratingController.updateFamilyTreeScore
 );

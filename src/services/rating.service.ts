@@ -20,15 +20,15 @@ export class RatingService {
   private rowToTalentState(row: Record<string, unknown>): TalentState {
     return {
       talentId: row.talent_id as string,
-      currentRating: Number(row.current_rating),
-      currentKFactor: Number(row.current_k_factor),
+      currentRating: Number(Number(row.current_rating).toFixed(2)),
+      currentKFactor: Number(Number(row.current_k_factor).toFixed(2)),
       engagementCount: Number(row.engagement_count),
       lastInputScores: {
-        interviewScore: Number(row.interview_score),
-        familyTreeScore: Number(row.family_tree_score),
-        assessmentScore: Number(row.assessment_score),
-        profileQualityScore: Number(row.profile_quality_score),
-        spotlightPerformanceScore: Number(row.spotlight_performance_score),
+        interviewScore: Number(Number(row.interview_score).toFixed(2)),
+        familyTreeScore: Number(Number(row.family_tree_score).toFixed(2)),
+        assessmentScore: Number(Number(row.assessment_score).toFixed(2)),
+        profileQualityScore: Number(Number(row.profile_quality_score).toFixed(2)),
+        spotlightPerformanceScore: Number(Number(row.spotlight_performance_score).toFixed(2)),
       },
       lastUpdated: new Date(row.last_updated as string),
     };
@@ -39,23 +39,23 @@ export class RatingService {
       entryId: row.entry_id as string,
       talentId: row.talent_id as string,
       timestamp: new Date(row.timestamp as string),
-      previousRating: Number(row.previous_rating),
-      newRating: Number(row.new_rating),
-      kFactorUsed: Number(row.k_factor_used),
+      previousRating: Number(Number(row.previous_rating).toFixed(2)),
+      newRating: Number(Number(row.new_rating).toFixed(2)),
+      kFactorUsed: Number(Number(row.k_factor_used).toFixed(2)),
       newEngagementCount: Number(row.new_engagement_count),
       inputScores: {
-        interviewScore: Number(row.input_interview_score),
-        familyTreeScore: Number(row.input_family_tree_score),
-        assessmentScore: Number(row.input_assessment_score),
-        profileQualityScore: Number(row.input_profile_quality_score),
-        spotlightPerformanceScore: Number(row.input_spotlight_performance_score),
+        interviewScore: Number(Number(row.input_interview_score).toFixed(2)),
+        familyTreeScore: Number(Number(row.input_family_tree_score).toFixed(2)),
+        assessmentScore: Number(Number(row.input_assessment_score).toFixed(2)),
+        profileQualityScore: Number(Number(row.input_profile_quality_score).toFixed(2)),
+        spotlightPerformanceScore: Number(Number(row.input_spotlight_performance_score).toFixed(2)),
       },
       currentScores: {
-        interviewScore: Number(row.current_interview_score),
-        familyTreeScore: Number(row.current_family_tree_score),
-        assessmentScore: Number(row.current_assessment_score),
-        profileQualityScore: Number(row.current_profile_quality_score),
-        spotlightPerformanceScore: Number(row.current_spotlight_performance_score),
+        interviewScore: Number(Number(row.current_interview_score).toFixed(2)),
+        familyTreeScore: Number(Number(row.current_family_tree_score).toFixed(2)),
+        assessmentScore: Number(Number(row.current_assessment_score).toFixed(2)),
+        profileQualityScore: Number(Number(row.current_profile_quality_score).toFixed(2)),
+        spotlightPerformanceScore: Number(Number(row.current_spotlight_performance_score).toFixed(2)),
       },
     };
   }
@@ -228,14 +228,14 @@ export class RatingService {
 
       // Accumulate on top of previous scores
       const newScores: BaseScoreInput = {
-        interviewScore: (prevScores.interviewScore ?? 0) + interviewDelta,
-        assessmentScore: (prevScores.assessmentScore ?? 0) + assessmentDelta,
-        spotlightPerformanceScore: (prevScores.spotlightPerformanceScore ?? 0) + spotlightDelta,
-        profileQualityScore: (prevScores.profileQualityScore ?? 0) + profileDelta,
-        familyTreeScore: (prevScores.familyTreeScore ?? 0) + familyDelta,
+        interviewScore: Number(((prevScores.interviewScore ?? 0) + interviewDelta).toFixed(2)),
+        assessmentScore: Number(((prevScores.assessmentScore ?? 0) + assessmentDelta).toFixed(2)),
+        spotlightPerformanceScore: Number(((prevScores.spotlightPerformanceScore ?? 0) + spotlightDelta).toFixed(2)),
+        profileQualityScore: Number(((prevScores.profileQualityScore ?? 0) + profileDelta).toFixed(2)),
+        familyTreeScore: Number(((prevScores.familyTreeScore ?? 0) + familyDelta).toFixed(2)),
       };
 
-      const newRating = this.getRatingTotal(newScores);
+      const newRating = Number(this.getRatingTotal(newScores).toFixed(2));
       const newEngagementCount = current.engagementCount + 1;
 
       // 1. Update talent_states row
