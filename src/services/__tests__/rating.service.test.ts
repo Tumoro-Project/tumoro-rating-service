@@ -51,7 +51,7 @@ describe('Rating Service - RatingService Unit Tests', () => {
 
       expect(pool.query).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO talent_states'),
-        expect.arrayContaining(['talent-123', 400, 1.0, 0])
+        expect.arrayContaining(['talent-123', 350, 1.0, 0])
       );
       expect(state.talentId).toBe('talent-123');
       expect(state.currentRating).toBe(400);
@@ -140,11 +140,9 @@ describe('Rating Service - RatingService Unit Tests', () => {
       expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
       expect(mockClient.release).toHaveBeenCalled();
 
-      // Interview delta for 10/10 with maxAbs=30:
-      // (10 - 3) / 7 * 30 = 30.
-      // previous interview was 100 -> new is 130
-      // new rating = 130 + 0 + 100 + 100 + 100 = 430
-      expect(updatedState.currentRating).toBe(430);
+      // Interview for 10/10 maps to 150 points
+      // Total = 150 (interview) + 0 (family tree) + 100 (assessment) + 300 (profile quality) + 100 (spotlight) = 650
+      expect(updatedState.currentRating).toBe(650);
       expect(updatedState.engagementCount).toBe(1);
     });
 
@@ -164,6 +162,29 @@ describe('Rating Service - RatingService Unit Tests', () => {
 
       expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
       expect(mockClient.release).toHaveBeenCalled();
+    });
+
+    it('should set and normalize familyTreeScore (0-10 or 0-100) and scale rating contribution (+0 to +100)', async () => {
+      (pool.query as jest.Mock).mockResolvedValueOnce({
+        rows: [sampleTalentRow],
+      });
+
+      const updatedState = await service.updateFamilyTreeScore('talent-123', 85);
+
+      expect(updatedState.lastInputScores.familyTreeScore).toBe(8.5);
+      // Base 600 + 8.5 * 20 (170) = 770
+      expect(updatedState.currentRating).toBe(770);
+    });
+
+    it('should reset familyTreeScore to 0 when score is 0', async () => {
+      (pool.query as jest.Mock).mockResolvedValueOnce({
+        rows: [{ ...sampleTalentRow, current_rating: '770', family_tree_score: '8.5' }],
+      });
+
+      const updatedState = await service.updateFamilyTreeScore('talent-123', 0);
+
+      expect(updatedState.lastInputScores.familyTreeScore).toBe(0);
+      expect(updatedState.currentRating).toBe(600);
     });
   });
 });

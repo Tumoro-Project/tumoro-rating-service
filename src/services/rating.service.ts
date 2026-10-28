@@ -1,18 +1,18 @@
 import { QueryResultRow } from 'pg';
 import { TalentState, RatingEntry, BaseScoreInput } from '../models/IDataModels';
-import { determineKFactor } from '../utilities/rating.helpers';
+import { determineKFactor, normalizeFamilyTreeScore } from '../utilities/rating.helpers';
 import { pool } from '../config/database';
 
 // Default accumulated scores for a brand-new talent
 const DEFAULT_SCORES: BaseScoreInput = {
-  interviewScore: 100,
+  interviewScore: 75,
   familyTreeScore: 0,
-  assessmentScore: 100,
-  profileQualityScore: 100,
-  spotlightPerformanceScore: 100,
+  assessmentScore: 75,
+  profileQualityScore: 0,
+  spotlightPerformanceScore: 0,
 };
 
-const DEFAULT_RATING = 400; // sum of defaults above
+const DEFAULT_RATING = 350; // sum of defaults above
 
 export class RatingService {
   // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -67,13 +67,20 @@ export class RatingService {
   }
 
   private getRatingTotal(scores: BaseScoreInput): number {
-    return (
-      (scores.interviewScore || 0) +
-      (scores.assessmentScore || 0) +
-      (scores.familyTreeScore || 0) +
-      (scores.profileQualityScore || 0) +
-      (scores.spotlightPerformanceScore || 0)
-    );
+    const rawFamily = scores.familyTreeScore || 0;
+    // Family Tree Lineage Score is 0–10. Without family tree connected, it contributes strictly 0.
+    // When connected (0–10), it contributes up to +200 points on 1000 scale (+2.00 on 10 scale).
+    const familyOutOf10 = rawFamily > 10 ? rawFamily / 10 : rawFamily;
+    const familyRatingContribution = Math.round(Math.max(0, Math.min(10, familyOutOf10)) * 20);
+
+    const interview = Math.max(0, Math.min(150, scores.interviewScore ?? 75));
+    const assessment = Math.max(0, Math.min(150, scores.assessmentScore ?? 75));
+    const profile = Math.max(0, Math.min(300, scores.profileQualityScore ?? 0));
+    const spotlight = Math.max(0, Math.min(100, scores.spotlightPerformanceScore ?? 0));
+
+    // Foundation Base = 200 (2.00 on 10 scale)
+    const total = 200 + profile + familyRatingContribution + interview + assessment + spotlight;
+    return Math.min(1000, Math.max(100, total));
   }
 
   // ─── Public API ───────────────────────────────────────────────────────────
@@ -175,8 +182,16 @@ export class RatingService {
     return this.recalculateRating(talentId, { interviewScore: score });
   }
 
-  public async updateFamilyTreeScore(talentId: string, score: number): Promise<TalentState> {
-    return this.recalculateRating(talentId, { familyTreeScore: score });
+  public async updateFamilyTreeScore(
+    talentId: string,
+    score: number,
+    mode: 'set' | 'delta' = 'set'
+  ): Promise<TalentState> {
+    return this.recalculateRating(
+      talentId,
+      { familyTreeScore: normalizeFamilyTreeScore(score) },
+      { familyTreeMode: mode }
+    );
   }
 
   public async updateAssessmentScore(talentId: string, score: number): Promise<TalentState> {
@@ -195,7 +210,8 @@ export class RatingService {
 
   private async recalculateRating(
     talentId: string,
-    inputScores: BaseScoreInput
+    inputScores: BaseScoreInput,
+    options?: { familyTreeMode?: 'set' | 'delta' }
   ): Promise<TalentState> {
     const client = await pool.connect();
     try {
@@ -205,34 +221,52 @@ export class RatingService {
       const prevScores = current.lastInputScores;
       const kFactor = determineKFactor(current.engagementCount);
 
-      // Convert into signed deltas ONLY if the score is provided
-      const interviewDelta = inputScores.interviewScore !== undefined
-        ? this.convertToSigned(inputScores.interviewScore, 30) * kFactor
-        : 0;
+      // Update profile quality score: if passed as 0-10 scale, convert to 0-300; if passed as 0-300, clamp.
+      let nextProfileScore = prevScores.profileQualityScore ?? 0;
+      if (inputScores.profileQualityScore !== undefined) {
+        const pInput = inputScores.profileQualityScore;
+        nextProfileScore = pInput <= 10 ? Math.round(pInput * 30) : Math.min(300, Math.max(0, pInput));
+      }
 
-      const assessmentDelta = inputScores.assessmentScore !== undefined
-        ? this.convertToSigned(inputScores.assessmentScore, 25) * kFactor
-        : 0;
+      // Interview and assessment scores: if passed as 0-10 scale, convert to 0-150; if passed as 0-150, clamp.
+      let nextInterviewScore = prevScores.interviewScore ?? 75;
+      if (inputScores.interviewScore !== undefined) {
+        const iInput = inputScores.interviewScore;
+        nextInterviewScore = iInput <= 10 ? Math.round(iInput * 15) : Math.min(150, Math.max(0, iInput));
+      }
 
-      const spotlightDelta = inputScores.spotlightPerformanceScore !== undefined
-        ? (inputScores.spotlightPerformanceScore || 0) * kFactor
-        : 0;
+      let nextAssessmentScore = prevScores.assessmentScore ?? 75;
+      if (inputScores.assessmentScore !== undefined) {
+        const aInput = inputScores.assessmentScore;
+        nextAssessmentScore = aInput <= 10 ? Math.round(aInput * 15) : Math.min(150, Math.max(0, aInput));
+      }
 
-      const profileDelta = inputScores.profileQualityScore !== undefined
-        ? (inputScores.profileQualityScore || 0) * kFactor
-        : 0;
+      let nextSpotlightScore = prevScores.spotlightPerformanceScore ?? 0;
+      if (inputScores.spotlightPerformanceScore !== undefined) {
+        nextSpotlightScore = Math.min(100, Math.max(0, inputScores.spotlightPerformanceScore));
+      }
 
-      const familyDelta = inputScores.familyTreeScore !== undefined
-        ? (inputScores.familyTreeScore || 0) * kFactor
-        : 0;
+      let nextFamilyTreeScore = Number((prevScores.familyTreeScore ?? 0).toFixed(2));
+      if (inputScores.familyTreeScore !== undefined) {
+        const normalizedInput = normalizeFamilyTreeScore(inputScores.familyTreeScore);
+        if ((options?.familyTreeMode ?? 'set') === 'set') {
+          // Questionnaire score sets/replaces the talent's Lineage Score (0–10), including 0 on reset
+          nextFamilyTreeScore = normalizedInput;
+        } else {
+          // Incremental bonus (e.g. referral completion), clamped to 0–10
+          const delta = normalizedInput * kFactor;
+          nextFamilyTreeScore = Number(
+            Math.min(10, Math.max(0, (prevScores.familyTreeScore ?? 0) + delta)).toFixed(2)
+          );
+        }
+      }
 
-      // Accumulate on top of previous scores
       const newScores: BaseScoreInput = {
-        interviewScore: Number(((prevScores.interviewScore ?? 0) + interviewDelta).toFixed(2)),
-        assessmentScore: Number(((prevScores.assessmentScore ?? 0) + assessmentDelta).toFixed(2)),
-        spotlightPerformanceScore: Number(((prevScores.spotlightPerformanceScore ?? 0) + spotlightDelta).toFixed(2)),
-        profileQualityScore: Number(((prevScores.profileQualityScore ?? 0) + profileDelta).toFixed(2)),
-        familyTreeScore: Number(((prevScores.familyTreeScore ?? 0) + familyDelta).toFixed(2)),
+        interviewScore: nextInterviewScore,
+        assessmentScore: nextAssessmentScore,
+        spotlightPerformanceScore: nextSpotlightScore,
+        profileQualityScore: nextProfileScore,
+        familyTreeScore: nextFamilyTreeScore,
       };
 
       const newRating = Number(this.getRatingTotal(newScores).toFixed(2));
@@ -294,6 +328,11 @@ export class RatingService {
 
       await client.query('COMMIT');
 
+      // Immediately propagate updated rating to search service index
+      this.syncRatingToServices(talentId, newRating, newScores).catch((syncErr) => {
+        console.warn('[RatingService] Non-blocking sync error:', syncErr?.message || syncErr);
+      });
+
       return {
         talentId,
         currentRating: newRating,
@@ -308,5 +347,37 @@ export class RatingService {
     } finally {
       client.release();
     }
+  }
+
+  /**
+   * Propagates rating updates immediately to the search cache and related services.
+   */
+  private async syncRatingToServices(
+    talentId: string,
+    newRating: number,
+    _scores: BaseScoreInput
+  ): Promise<void> {
+    const searchUrl = process.env.SEARCH_SERVICE_URL || 'http://localhost:3005';
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+      fetch(`${searchUrl}/talents/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          talentId,
+          data: {
+            ratingScore: newRating,
+          },
+        }),
+        signal: controller.signal,
+      })
+        .then(() => clearTimeout(timeoutId))
+        .catch((err) => {
+          clearTimeout(timeoutId);
+          console.warn('[RatingService] Search index sync warning:', err?.message || err);
+        });
+    } catch {}
   }
 }

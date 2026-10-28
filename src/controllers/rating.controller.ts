@@ -1,6 +1,10 @@
 import { Request, Response } from 'express';
 import { RatingService } from '../services/rating.service';
 import { BaseScoreInput } from '../models/IDataModels';
+import {
+  calculateFamilyHistoryQuestionnaireScore,
+  normalizeFamilyTreeScore,
+} from '../utilities/rating.helpers';
 
 const ratingService = new RatingService();
 
@@ -75,12 +79,31 @@ export class RatingController {
 
   /**
    * POST /v1/ratings/update/:talentId/family-tree-score
+   * Supports updating via:
+   *  - { score } (0–10 Lineage Score or 0–100 raw points)
+   *  - { rawPoints } (0–100 raw questionnaire points)
+   *  - { answers } (weighted 10-question Family History Commitment Questionnaire answers)
    */
   public async updateFamilyTreeScore(req: Request, res: Response): Promise<void> {
     try {
       const talentId = req.params.talentId as string;
-      const { score } = req.body;
-      const newTalentState = await ratingService.updateFamilyTreeScore(talentId, score);
+      const { score, rawPoints, answers, mode } = req.body;
+
+      let resolvedScore = 0;
+      if (answers && typeof answers === 'object' && Object.keys(answers).length > 0) {
+        const computed = calculateFamilyHistoryQuestionnaireScore(answers);
+        resolvedScore = computed.scoreOutOf10;
+      } else if (typeof rawPoints === 'number') {
+        resolvedScore = normalizeFamilyTreeScore(rawPoints);
+      } else if (typeof score === 'number') {
+        resolvedScore = normalizeFamilyTreeScore(score);
+      }
+
+      const newTalentState = await ratingService.updateFamilyTreeScore(
+        talentId,
+        resolvedScore,
+        mode ?? 'set'
+      );
       res.status(200).json(newTalentState);
     } catch (err) {
       console.error('updateFamilyTreeScore error:', err);

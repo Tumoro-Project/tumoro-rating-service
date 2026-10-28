@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { RatingController } from '../controllers/rating.controller';
 import { validate } from '../middleware/validation';
-import { baseScoreSchema, singleScoreSchema } from '../middleware/schemas';
+import { baseScoreSchema, singleScoreSchema, familyTreeScoreSchema } from '../middleware/schemas';
 import { authenticate, authenticateService, requireRole } from '../middleware/auth.middleware';
 import { UserRole } from '../types';
 
@@ -34,7 +34,12 @@ const canUpdateFamilyTreeOrService = [
         authenticate(req as any, res, () => {
             const user = (req as any).user;
             const talentId = req.params.talentId;
-            if (user?.userId === talentId || user?.role === UserRole.ADMIN || user?.role === UserRole.REVIEWER) {
+            if (
+                user?.userId === talentId ||
+                (user as any)?.id === talentId ||
+                user?.role === UserRole.ADMIN ||
+                user?.role === UserRole.REVIEWER
+            ) {
                 return next();
             }
             res.status(403).json({ error: 'Forbidden: Insufficient permissions' });
@@ -200,7 +205,7 @@ router.post(
 router.post(
     '/v1/ratings/update/:talentId/family-tree-score',
     ...canUpdateFamilyTreeOrService,
-    validate(singleScoreSchema),
+    validate(familyTreeScoreSchema),
     ratingController.updateFamilyTreeScore
 );
 
