@@ -8,6 +8,7 @@ import {
     EventStatus,
 } from '../types/events';
 import { BaseScoreInput } from '../models/IDataModels';
+import { normalizeFamilyTreeScore } from '../utilities/rating.helpers';
 
 const ratingService = new RatingService();
 
@@ -33,7 +34,7 @@ function mapEventToScores(
             return { spotlightPerformanceScore: payload.score };
 
         case ActivityEventType.FAMILY_TREE_UPDATED:
-            return { familyTreeScore: payload.score };
+            return { familyTreeScore: normalizeFamilyTreeScore(payload.score) };
 
         default:
             throw new Error(`Unknown event type: ${eventType}`);
