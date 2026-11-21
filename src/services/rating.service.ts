@@ -1,18 +1,19 @@
 import { QueryResultRow } from 'pg';
 import { TalentState, RatingEntry, BaseScoreInput } from '../models/IDataModels';
+import { CharacterRatingInput } from '../middleware/schemas';
 import { determineKFactor, normalizeFamilyTreeScore } from '../utilities/rating.helpers';
 import { pool } from '../config/database';
 
 // Default accumulated scores for a brand-new talent
 const DEFAULT_SCORES: BaseScoreInput = {
-  interviewScore: 75,
+  interviewScore: 0,
   familyTreeScore: 0,
-  assessmentScore: 75,
+  assessmentScore: 0,
   profileQualityScore: 0,
   spotlightPerformanceScore: 0,
 };
 
-const DEFAULT_RATING = 350; // sum of defaults above
+const DEFAULT_RATING = 0; // sum of defaults above
 
 export class RatingService {
   // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -69,18 +70,18 @@ export class RatingService {
   private getRatingTotal(scores: BaseScoreInput): number {
     const rawFamily = scores.familyTreeScore || 0;
     // Family Tree Lineage Score is 0–10. Without family tree connected, it contributes strictly 0.
-    // When connected (0–10), it contributes up to +200 points on 1000 scale (+2.00 on 10 scale).
+    // When connected (0–10), it contributes up to +100 points on 1000 scale (+1.00 on 10 scale).
     const familyOutOf10 = rawFamily > 10 ? rawFamily / 10 : rawFamily;
-    const familyRatingContribution = Math.round(Math.max(0, Math.min(10, familyOutOf10)) * 20);
+    const familyRatingContribution = Math.round(Math.max(0, Math.min(10, familyOutOf10)) * 10);
 
-    const interview = Math.max(0, Math.min(150, scores.interviewScore ?? 75));
-    const assessment = Math.max(0, Math.min(150, scores.assessmentScore ?? 75));
-    const profile = Math.max(0, Math.min(300, scores.profileQualityScore ?? 0));
+    const interview = Math.max(0, Math.min(400, scores.interviewScore ?? 0));
+    const assessment = Math.max(0, Math.min(250, scores.assessmentScore ?? 0));
+    const profile = Math.max(0, Math.min(250, scores.profileQualityScore ?? 0));
     const spotlight = Math.max(0, Math.min(100, scores.spotlightPerformanceScore ?? 0));
 
-    // Foundation Base = 200 (2.00 on 10 scale)
-    const total = 200 + profile + familyRatingContribution + interview + assessment + spotlight;
-    return Math.min(1000, Math.max(100, total));
+    // Sum of pillars with 0 foundation base (range 0–1000, i.e. 0.00–10.00)
+    const total = profile + familyRatingContribution + interview + assessment + spotlight;
+    return Math.min(1000, Math.max(0, total));
   }
 
   // ─── Public API ───────────────────────────────────────────────────────────
@@ -221,24 +222,25 @@ export class RatingService {
       const prevScores = current.lastInputScores;
       const kFactor = determineKFactor(current.engagementCount);
 
-      // Update profile quality score: if passed as 0-10 scale, convert to 0-300; if passed as 0-300, clamp.
+      // Update profile quality score: if passed as 0-10 scale, convert to 0-250; if passed as 0-250, clamp.
       let nextProfileScore = prevScores.profileQualityScore ?? 0;
       if (inputScores.profileQualityScore !== undefined) {
         const pInput = inputScores.profileQualityScore;
-        nextProfileScore = pInput <= 10 ? Math.round(pInput * 30) : Math.min(300, Math.max(0, pInput));
+        nextProfileScore = pInput <= 10 ? Math.round(pInput * 25) : Math.min(250, Math.max(0, pInput));
       }
 
-      // Interview and assessment scores: if passed as 0-10 scale, convert to 0-150; if passed as 0-150, clamp.
-      let nextInterviewScore = prevScores.interviewScore ?? 75;
+      // Interview score: if passed as 0-10 scale, convert to 0-400; if passed as 0-400, clamp.
+      let nextInterviewScore = prevScores.interviewScore ?? 0;
       if (inputScores.interviewScore !== undefined) {
         const iInput = inputScores.interviewScore;
-        nextInterviewScore = iInput <= 10 ? Math.round(iInput * 15) : Math.min(150, Math.max(0, iInput));
+        nextInterviewScore = iInput <= 10 ? Math.round(iInput * 40) : Math.min(400, Math.max(0, iInput));
       }
 
-      let nextAssessmentScore = prevScores.assessmentScore ?? 75;
+      // Assessment score: if passed as 0-10 scale, convert to 0-250; if passed as 0-250, clamp.
+      let nextAssessmentScore = prevScores.assessmentScore ?? 0;
       if (inputScores.assessmentScore !== undefined) {
         const aInput = inputScores.assessmentScore;
-        nextAssessmentScore = aInput <= 10 ? Math.round(aInput * 15) : Math.min(150, Math.max(0, aInput));
+        nextAssessmentScore = aInput <= 10 ? Math.round(aInput * 25) : Math.min(250, Math.max(0, aInput));
       }
 
       let nextSpotlightScore = prevScores.spotlightPerformanceScore ?? 0;
@@ -350,6 +352,211 @@ export class RatingService {
   }
 
   /**
+   * Submit or update a peer character rating for a talent.
+   * Updates talent_states.character_score without changing the 4-pillar current_rating.
+   */
+  public async submitCharacterRating(
+    raterId: string,
+    input: CharacterRatingInput
+  ): Promise<{
+    success: boolean;
+    message: string;
+    newCharacterScore: number;
+    totalCount: number;
+  }> {
+    if (raterId === input.talentId) {
+      const err = new Error('You cannot rate your own character.');
+      (err as any).statusCode = 400;
+      throw err;
+    }
+
+    // Ensure target talent exists in talent_states
+    await this.getTalentState(input.talentId);
+
+    await pool.query(
+      `INSERT INTO character_ratings (
+         talent_id, rater_id, integrity, consistency, investment_in_others,
+         long_term_thinking, honesty, rater_relationship, anonymous, session_id,
+         created_at, updated_at
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+       ON CONFLICT (talent_id, rater_id) DO UPDATE SET
+         integrity = EXCLUDED.integrity,
+         consistency = EXCLUDED.consistency,
+         investment_in_others = EXCLUDED.investment_in_others,
+         long_term_thinking = EXCLUDED.long_term_thinking,
+         honesty = EXCLUDED.honesty,
+         rater_relationship = EXCLUDED.rater_relationship,
+         anonymous = EXCLUDED.anonymous,
+         session_id = COALESCE(EXCLUDED.session_id, character_ratings.session_id),
+         updated_at = NOW()`,
+      [
+        input.talentId,
+        raterId,
+        input.integrity,
+        input.consistency,
+        input.investmentInOthers,
+        input.longTermThinking,
+        input.honesty,
+        input.raterRelationship,
+        input.anonymous ?? true,
+        input.sessionId ?? null,
+      ]
+    );
+
+    const aggRes = await pool.query(
+      `SELECT
+         COUNT(*)::int AS total_count,
+         COALESCE(AVG((integrity + consistency + investment_in_others + long_term_thinking + honesty) / 5.0), 0)::float AS avg_score
+       FROM character_ratings
+       WHERE talent_id = $1`,
+      [input.talentId]
+    );
+
+    const totalCount = Number(aggRes.rows[0]?.total_count || 0);
+    const newCharacterScore = Number(Number(aggRes.rows[0]?.avg_score || 0).toFixed(2));
+
+    await pool.query(
+      `UPDATE talent_states
+       SET character_score = $1, last_updated = NOW()
+       WHERE talent_id = $2`,
+      [newCharacterScore, input.talentId]
+    );
+
+    return {
+      success: true,
+      message: 'Character rating saved',
+      newCharacterScore,
+      totalCount,
+    };
+  }
+
+  /**
+   * Returns aggregated peer character breakdown for a talent.
+   * Individual dimension averages remain hidden (0) until totalCount >= 5.
+   */
+  public async getCharacterBreakdown(
+    talentId: string,
+    viewerId?: string
+  ): Promise<{
+    totalCount: number;
+    publicScore: boolean;
+    averages: {
+      integrity: number;
+      consistency: number;
+      investmentInOthers: number;
+      longTermThinking: number;
+      honesty: number;
+    };
+    raterRelationshipCounts: {
+      PROFESSIONAL: number;
+      COLLEAGUE: number;
+      COMMUNITY: number;
+      MENTOR: number;
+    };
+    hasCharacterMomentum: boolean;
+    viewerHasRated?: boolean;
+    viewerRating?: {
+      integrity: number;
+      consistency: number;
+      investmentInOthers: number;
+      longTermThinking: number;
+      honesty: number;
+      raterRelationship: string;
+      anonymous: boolean;
+    };
+  }> {
+    const aggRes = await pool.query(
+      `SELECT
+         COUNT(*)::int AS total_count,
+         COALESCE(AVG(integrity), 0)::float AS avg_integrity,
+         COALESCE(AVG(consistency), 0)::float AS avg_consistency,
+         COALESCE(AVG(investment_in_others), 0)::float AS avg_investment,
+         COALESCE(AVG(long_term_thinking), 0)::float AS avg_long_term,
+         COALESCE(AVG(honesty), 0)::float AS avg_honesty,
+         COUNT(*) FILTER (WHERE rater_relationship = 'PROFESSIONAL')::int AS rel_professional,
+         COUNT(*) FILTER (WHERE rater_relationship = 'COLLEAGUE')::int AS rel_colleague,
+         COUNT(*) FILTER (WHERE rater_relationship = 'COMMUNITY')::int AS rel_community,
+         COUNT(*) FILTER (WHERE rater_relationship = 'MENTOR')::int AS rel_mentor,
+         COUNT(*) FILTER (WHERE updated_at >= NOW() - INTERVAL '90 days')::int AS recent_count,
+         COALESCE(AVG((integrity + consistency + investment_in_others + long_term_thinking + honesty) / 5.0) FILTER (WHERE updated_at >= NOW() - INTERVAL '90 days'), 0)::float AS recent_avg
+       FROM character_ratings
+       WHERE talent_id = $1`,
+      [talentId]
+    );
+
+    const row = aggRes.rows[0] || {};
+    const totalCount = Number(row.total_count || 0);
+    const publicScore = totalCount >= 5;
+    const recentCount = Number(row.recent_count || 0);
+    const recentAvg = Number(row.recent_avg || 0);
+    const round2 = (v: unknown) => Number(Number(v || 0).toFixed(2));
+
+    let viewerHasRated: boolean | undefined;
+    let viewerRating:
+      | {
+          integrity: number;
+          consistency: number;
+          investmentInOthers: number;
+          longTermThinking: number;
+          honesty: number;
+          raterRelationship: string;
+          anonymous: boolean;
+        }
+      | undefined;
+
+    if (viewerId) {
+      const viewerRes = await pool.query(
+        `SELECT integrity, consistency, investment_in_others, long_term_thinking, honesty, rater_relationship, anonymous
+         FROM character_ratings
+         WHERE talent_id = $1 AND rater_id = $2
+         LIMIT 1`,
+        [talentId, viewerId]
+      );
+      const vr = viewerRes.rows[0];
+      viewerHasRated = Boolean(vr);
+      if (vr) {
+        viewerRating = {
+          integrity: Number(vr.integrity),
+          consistency: Number(vr.consistency),
+          investmentInOthers: Number(vr.investment_in_others),
+          longTermThinking: Number(vr.long_term_thinking),
+          honesty: Number(vr.honesty),
+          raterRelationship: String(vr.rater_relationship),
+          anonymous: Boolean(vr.anonymous),
+        };
+      }
+    }
+
+    return {
+      totalCount,
+      publicScore,
+      averages: publicScore
+        ? {
+            integrity: round2(row.avg_integrity),
+            consistency: round2(row.avg_consistency),
+            investmentInOthers: round2(row.avg_investment),
+            longTermThinking: round2(row.avg_long_term),
+            honesty: round2(row.avg_honesty),
+          }
+        : {
+            integrity: 0,
+            consistency: 0,
+            investmentInOthers: 0,
+            longTermThinking: 0,
+            honesty: 0,
+          },
+      raterRelationshipCounts: {
+        PROFESSIONAL: Number(row.rel_professional || 0),
+        COLLEAGUE: Number(row.rel_colleague || 0),
+        COMMUNITY: Number(row.rel_community || 0),
+        MENTOR: Number(row.rel_mentor || 0),
+      },
+      hasCharacterMomentum: recentCount >= 2 && recentAvg >= 3.8,
+      ...(viewerId ? { viewerHasRated, viewerRating } : {}),
+    };
+  }
+
+  /**
    * Propagates rating updates immediately to the search cache and related services.
    */
   private async syncRatingToServices(
@@ -357,14 +564,20 @@ export class RatingService {
     newRating: number,
     _scores: BaseScoreInput
   ): Promise<void> {
-    const searchUrl = process.env.SEARCH_SERVICE_URL || 'http://localhost:3005';
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500);
+    const searchUrl = process.env.SEARCH_SERVICE_URL || 'http://localhost:3004';
+    const base = searchUrl.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '');
+    const serviceSecret = process.env.SERVICE_SECRET;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (serviceSecret) {
+      headers['Authorization'] = `Service ${serviceSecret}`;
+    }
 
-      fetch(`${searchUrl}/talents/sync`, {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    try {
+      const res = await fetch(`${base}/api/v1/sync`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           talentId,
           data: {
@@ -372,12 +585,14 @@ export class RatingService {
           },
         }),
         signal: controller.signal,
-      })
-        .then(() => clearTimeout(timeoutId))
-        .catch((err) => {
-          clearTimeout(timeoutId);
-          console.warn('[RatingService] Search index sync warning:', err?.message || err);
-        });
-    } catch {}
+      });
+      if (!res.ok) {
+        console.warn(`[RatingService] Search index sync warning: HTTP ${res.status}`);
+      }
+    } catch (err: any) {
+      console.warn('[RatingService] Search index sync warning:', err?.message || err);
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 }

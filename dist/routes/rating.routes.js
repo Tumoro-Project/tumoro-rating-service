@@ -22,6 +22,26 @@ const canWriteRatingsOrService = [
         (0, auth_middleware_1.authenticate)(req, res, () => (0, auth_middleware_1.requireRole)(types_1.UserRole.ADMIN, types_1.UserRole.REVIEWER)(req, res, next));
     },
 ];
+// Talents can update their own family tree score; admins, reviewers, and internal services can also update
+const canUpdateFamilyTreeOrService = [
+    (req, res, next) => {
+        const authHeader = req.headers.authorization || '';
+        if (authHeader.startsWith('Service ')) {
+            return (0, auth_middleware_1.authenticateService)(req, res, next);
+        }
+        (0, auth_middleware_1.authenticate)(req, res, () => {
+            const user = req.user;
+            const talentId = req.params.talentId;
+            if (user?.userId === talentId ||
+                user?.id === talentId ||
+                user?.role === types_1.UserRole.ADMIN ||
+                user?.role === types_1.UserRole.REVIEWER) {
+                return next();
+            }
+            res.status(403).json({ error: 'Forbidden: Insufficient permissions' });
+        });
+    },
+];
 /**
  * @swagger
  * /v1/talent/{talentId}/rating:
@@ -52,6 +72,8 @@ const canWriteRatingsOrService = [
  *         description: Unauthorized
  */
 router.get('/v1/talent/:talentId/rating', auth_middleware_1.authenticate, ratingController.getTalentRating);
+router.get('/v1/talent/:talentId/character-breakdown', auth_middleware_1.optionalAuthenticate, ratingController.getCharacterBreakdown);
+router.post('/v1/character-ratings', auth_middleware_1.authenticate, (0, validation_1.validate)(schemas_1.characterRatingSchema), ratingController.submitCharacterRating);
 /**
  * @swagger
  * /v1/ratings/trending:
@@ -150,7 +172,7 @@ router.post('/v1/ratings/update/:talentId/interview-score', ...canWriteRatingsOr
  *       200:
  *         description: The updated talent rating.
  */
-router.post('/v1/ratings/update/:talentId/family-tree-score', ...canWriteRatingsOrService, (0, validation_1.validate)(schemas_1.singleScoreSchema), ratingController.updateFamilyTreeScore);
+router.post('/v1/ratings/update/:talentId/family-tree-score', ...canUpdateFamilyTreeOrService, (0, validation_1.validate)(schemas_1.familyTreeScoreSchema), ratingController.updateFamilyTreeScore);
 /**
  * @swagger
  * /v1/ratings/update/{talentId}/assessment-score:

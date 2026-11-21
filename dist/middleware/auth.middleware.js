@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.authenticate = authenticate;
+exports.optionalAuthenticate = optionalAuthenticate;
 exports.requireRole = requireRole;
 exports.requireAdmin = requireAdmin;
 exports.authenticateService = authenticateService;
@@ -44,6 +45,37 @@ function authenticate(req, res, next) {
     catch {
         res.status(401).json({ error: 'Invalid or expired token' });
     }
+}
+/**
+ * Optional authentication: attaches req.user when a valid Bearer access JWT
+ * is present, otherwise continues as an anonymous request.
+ */
+function optionalAuthenticate(req, _res, next) {
+    try {
+        if (!JWT_SECRET) {
+            next();
+            return;
+        }
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            next();
+            return;
+        }
+        const token = authHeader.substring(7);
+        const payload = jsonwebtoken_1.default.verify(token, JWT_SECRET);
+        if (payload.type === 'access' && payload.userId && payload.email && payload.role) {
+            req.user = {
+                userId: payload.userId,
+                email: payload.email,
+                role: payload.role,
+                type: 'access',
+            };
+        }
+    }
+    catch {
+        // Ignore invalid/expired token on public read routes
+    }
+    next();
 }
 // ─── Role Guards ──────────────────────────────────────────────────────────
 /**

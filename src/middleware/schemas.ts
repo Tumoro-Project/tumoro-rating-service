@@ -35,7 +35,20 @@ export const familyTreeScoreSchema = z
     }
   );
 
+export const characterRatingSchema = z.object({
+  talentId: z.string().trim().min(1, "talentId is required"),
+  integrity: z.number().int().min(1).max(5),
+  consistency: z.number().int().min(1).max(5),
+  investmentInOthers: z.number().int().min(1).max(5),
+  longTermThinking: z.number().int().min(1).max(5),
+  honesty: z.number().int().min(1).max(5),
+  raterRelationship: z.enum(["PROFESSIONAL", "COLLEAGUE", "COMMUNITY", "MENTOR"]),
+  anonymous: z.boolean().optional().default(true),
+  sessionId: z.string().trim().min(1).optional(),
+});
+
 // Inferred TypeScript types — no need to write interfaces separately
 export type BaseScoreInput = z.infer<typeof baseScoreSchema>;
 export type SingleScoreInput = z.infer<typeof singleScoreSchema>;
 export type FamilyTreeScoreInput = z.infer<typeof familyTreeScoreSchema>;
+export type CharacterRatingInput = z.infer<typeof characterRatingSchema>;
