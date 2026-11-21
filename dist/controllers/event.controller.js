@@ -15,7 +15,7 @@ const createEventSchema = zod_1.z.object({
     }),
     sourceService: zod_1.z.string().min(1, 'sourceService is required'),
     payload: zod_1.z.object({
-        score: zod_1.z.number().min(0).max(10),
+        score: zod_1.z.number().min(0).max(100),
         metadata: zod_1.z.record(zod_1.z.unknown()).optional(),
     }),
 });

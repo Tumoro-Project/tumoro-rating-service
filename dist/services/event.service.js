@@ -4,6 +4,7 @@ exports.EventService = void 0;
 const database_1 = require("../config/database");
 const rating_service_1 = require("./rating.service");
 const events_1 = require("../types/events");
+const rating_helpers_1 = require("../utilities/rating.helpers");
 const ratingService = new rating_service_1.RatingService();
 /**
  * Maps an event type to a BaseScoreInput with only the relevant
@@ -20,7 +21,7 @@ function mapEventToScores(eventType, payload) {
         case events_1.ActivityEventType.SPOTLIGHT_POSTED:
             return { spotlightPerformanceScore: payload.score };
         case events_1.ActivityEventType.FAMILY_TREE_UPDATED:
-            return { familyTreeScore: payload.score };
+            return { familyTreeScore: (0, rating_helpers_1.normalizeFamilyTreeScore)(payload.score) };
         default:
             throw new Error(`Unknown event type: ${eventType}`);
     }

@@ -1,8 +1,18 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { RatingController } from '../controllers/rating.controller';
 import { validate } from '../middleware/validation';
-import { baseScoreSchema, singleScoreSchema, familyTreeScoreSchema } from '../middleware/schemas';
-import { authenticate, authenticateService, requireRole } from '../middleware/auth.middleware';
+import {
+    baseScoreSchema,
+    singleScoreSchema,
+    familyTreeScoreSchema,
+    characterRatingSchema,
+} from '../middleware/schemas';
+import {
+    authenticate,
+    optionalAuthenticate,
+    authenticateService,
+    requireRole,
+} from '../middleware/auth.middleware';
 import { UserRole } from '../types';
 
 const router = Router();
@@ -84,7 +94,15 @@ router.get(
 
 router.get(
     '/v1/talent/:talentId/character-breakdown',
+    optionalAuthenticate,
     ratingController.getCharacterBreakdown
+);
+
+router.post(
+    '/v1/character-ratings',
+    authenticate,
+    validate(characterRatingSchema),
+    ratingController.submitCharacterRating
 );
 
 /**

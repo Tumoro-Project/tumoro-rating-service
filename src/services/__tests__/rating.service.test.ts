@@ -19,14 +19,14 @@ describe('Rating Service - RatingService Unit Tests', () => {
 
   const sampleTalentRow = {
     talent_id: 'talent-123',
-    current_rating: '400',
+    current_rating: '0',
     current_k_factor: '1.0',
     engagement_count: '0',
-    interview_score: '100',
+    interview_score: '0',
     family_tree_score: '0',
-    assessment_score: '100',
-    profile_quality_score: '100',
-    spotlight_performance_score: '100',
+    assessment_score: '0',
+    profile_quality_score: '0',
+    spotlight_performance_score: '0',
     last_updated: '2026-01-01T00:00:00Z',
   };
 
@@ -51,13 +51,13 @@ describe('Rating Service - RatingService Unit Tests', () => {
 
       expect(pool.query).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO talent_states'),
-        expect.arrayContaining(['talent-123', 350, 1.0, 0])
+        ['talent-123', 0, 1.0, 0, 0, 0, 0, 0, 0]
       );
       expect(state.talentId).toBe('talent-123');
-      expect(state.currentRating).toBe(400);
+      expect(state.currentRating).toBe(0);
       expect(state.currentKFactor).toBe(1.0);
       expect(state.engagementCount).toBe(0);
-      expect(state.lastInputScores.interviewScore).toBe(100);
+      expect(state.lastInputScores.interviewScore).toBe(0);
     });
 
     it('should select existing row if UPSERT returns empty (conflict)', async () => {
@@ -75,7 +75,7 @@ describe('Rating Service - RatingService Unit Tests', () => {
         ['talent-123']
       );
       expect(state.talentId).toBe('talent-123');
-      expect(state.currentRating).toBe(400);
+      expect(state.currentRating).toBe(0);
     });
   });
 
@@ -140,9 +140,9 @@ describe('Rating Service - RatingService Unit Tests', () => {
       expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
       expect(mockClient.release).toHaveBeenCalled();
 
-      // Interview for 10/10 maps to 150 points
-      // Total = 150 (interview) + 0 (family tree) + 100 (assessment) + 300 (profile quality) + 100 (spotlight) = 650
-      expect(updatedState.currentRating).toBe(650);
+      // Interview for 10/10 maps to 400 points (0 foundation base)
+      expect(updatedState.lastInputScores.interviewScore).toBe(400);
+      expect(updatedState.currentRating).toBe(400);
       expect(updatedState.engagementCount).toBe(1);
     });
 
@@ -172,19 +172,59 @@ describe('Rating Service - RatingService Unit Tests', () => {
       const updatedState = await service.updateFamilyTreeScore('talent-123', 85);
 
       expect(updatedState.lastInputScores.familyTreeScore).toBe(8.5);
-      // Base 600 + 8.5 * 20 (170) = 770
-      expect(updatedState.currentRating).toBe(770);
+      // 8.5 * 10 = 85 points
+      expect(updatedState.currentRating).toBe(85);
     });
 
     it('should reset familyTreeScore to 0 when score is 0', async () => {
       (pool.query as jest.Mock).mockResolvedValueOnce({
-        rows: [{ ...sampleTalentRow, current_rating: '770', family_tree_score: '8.5' }],
+        rows: [{ ...sampleTalentRow, current_rating: '85', family_tree_score: '8.5' }],
       });
 
       const updatedState = await service.updateFamilyTreeScore('talent-123', 0);
 
       expect(updatedState.lastInputScores.familyTreeScore).toBe(0);
-      expect(updatedState.currentRating).toBe(600);
+      expect(updatedState.currentRating).toBe(0);
+    });
+
+    it('should scale profileQualityScore (0-10 -> 0-250) and assessmentScore (0-10 -> 0-250)', async () => {
+      (pool.query as jest.Mock).mockResolvedValueOnce({
+        rows: [sampleTalentRow],
+      });
+      const profileUpdated = await service.updateProfileQualityScore('talent-123', 10);
+      expect(profileUpdated.lastInputScores.profileQualityScore).toBe(250);
+      expect(profileUpdated.currentRating).toBe(250);
+
+      (pool.query as jest.Mock).mockResolvedValueOnce({
+        rows: [sampleTalentRow],
+      });
+      const assessmentUpdated = await service.updateAssessmentScore('talent-123', 10);
+      expect(assessmentUpdated.lastInputScores.assessmentScore).toBe(250);
+      expect(assessmentUpdated.currentRating).toBe(250);
+    });
+
+    it('should reach 1000 max when all 4 pillars are 10 and allow 0 default', async () => {
+      (pool.query as jest.Mock).mockResolvedValueOnce({
+        rows: [sampleTalentRow],
+      });
+      const maxState = await service.updateTalentRating('talent-123', {
+        interviewScore: 10,
+        profileQualityScore: 10,
+        assessmentScore: 10,
+        familyTreeScore: 10,
+      });
+      expect(maxState.currentRating).toBe(1000);
+
+      (pool.query as jest.Mock).mockResolvedValueOnce({
+        rows: [sampleTalentRow],
+      });
+      const zeroState = await service.updateTalentRating('talent-123', {
+        interviewScore: 0,
+        profileQualityScore: 0,
+        assessmentScore: 0,
+        familyTreeScore: 0,
+      });
+      expect(zeroState.currentRating).toBe(0);
     });
   });
 });

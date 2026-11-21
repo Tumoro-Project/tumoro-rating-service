@@ -37,16 +37,25 @@ async function initDatabase() {
       -- Stores the current rating state for each talent
       CREATE TABLE IF NOT EXISTS talent_states (
         talent_id                   VARCHAR(255)   PRIMARY KEY,
-        current_rating              NUMERIC(10, 4) NOT NULL DEFAULT 400,
+        current_rating              NUMERIC(10, 4) NOT NULL DEFAULT 0,
         current_k_factor            NUMERIC(5, 4)  NOT NULL DEFAULT 1.0,
         engagement_count            INTEGER        NOT NULL DEFAULT 0,
-        interview_score             NUMERIC(10, 4) NOT NULL DEFAULT 100,
+        interview_score             NUMERIC(10, 4) NOT NULL DEFAULT 0,
         family_tree_score           NUMERIC(10, 4) NOT NULL DEFAULT 0,
-        assessment_score            NUMERIC(10, 4) NOT NULL DEFAULT 100,
-        profile_quality_score       NUMERIC(10, 4) NOT NULL DEFAULT 100,
-        spotlight_performance_score NUMERIC(10, 4) NOT NULL DEFAULT 100,
+        assessment_score            NUMERIC(10, 4) NOT NULL DEFAULT 0,
+        profile_quality_score       NUMERIC(10, 4) NOT NULL DEFAULT 0,
+        spotlight_performance_score NUMERIC(10, 4) NOT NULL DEFAULT 0,
+        character_score             NUMERIC(10, 4) NOT NULL DEFAULT 0,
         last_updated                TIMESTAMPTZ    NOT NULL DEFAULT NOW()
       );
+
+      ALTER TABLE talent_states
+        ALTER COLUMN current_rating SET DEFAULT 0,
+        ALTER COLUMN interview_score SET DEFAULT 0,
+        ALTER COLUMN family_tree_score SET DEFAULT 0,
+        ALTER COLUMN assessment_score SET DEFAULT 0,
+        ALTER COLUMN profile_quality_score SET DEFAULT 0,
+        ALTER COLUMN spotlight_performance_score SET DEFAULT 0;
 
       -- Append-only audit log of every rating change
       CREATE TABLE IF NOT EXISTS rating_entries (
@@ -63,12 +72,20 @@ async function initDatabase() {
         input_assessment_score                NUMERIC(10, 4),
         input_profile_quality_score           NUMERIC(10, 4),
         input_spotlight_performance_score     NUMERIC(10, 4),
+        -- new character dimensions
+        input_integrity                       INTEGER,
+        input_consistency                     INTEGER,
+        input_investment_in_others            INTEGER,
+        input_long_term_thinking              INTEGER,
+        input_honesty                         INTEGER,
+        rater_relationship                    VARCHAR(50),
         -- accumulated scores after this change
         current_interview_score               NUMERIC(10, 4),
         current_family_tree_score             NUMERIC(10, 4),
         current_assessment_score              NUMERIC(10, 4),
         current_profile_quality_score         NUMERIC(10, 4),
-        current_spotlight_performance_score   NUMERIC(10, 4)
+        current_spotlight_performance_score   NUMERIC(10, 4),
+        current_character_score               NUMERIC(10, 4)
       );
 
       -- Event log: every activity from any service that affects ratings
@@ -88,6 +105,28 @@ async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_activity_events_talent_id ON activity_events(talent_id);
       -- Index for quickly finding all failed events
       CREATE INDEX IF NOT EXISTS idx_activity_events_status ON activity_events(status);
+      -- Index for weekly momentum calculation (7-day delta)
+      CREATE INDEX IF NOT EXISTS idx_rating_entries_talent_timestamp ON rating_entries(talent_id, timestamp DESC);
+
+      -- Peer-to-peer character ratings (1-5 per dimension, one active rating per rater->talent pair)
+      CREATE TABLE IF NOT EXISTS character_ratings (
+        id                   UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+        talent_id            VARCHAR(255) NOT NULL,
+        rater_id             VARCHAR(255) NOT NULL,
+        integrity            SMALLINT     NOT NULL CHECK (integrity BETWEEN 1 AND 5),
+        consistency          SMALLINT     NOT NULL CHECK (consistency BETWEEN 1 AND 5),
+        investment_in_others SMALLINT     NOT NULL CHECK (investment_in_others BETWEEN 1 AND 5),
+        long_term_thinking   SMALLINT     NOT NULL CHECK (long_term_thinking BETWEEN 1 AND 5),
+        honesty              SMALLINT     NOT NULL CHECK (honesty BETWEEN 1 AND 5),
+        rater_relationship   VARCHAR(32)  NOT NULL,
+        anonymous            BOOLEAN      NOT NULL DEFAULT TRUE,
+        session_id           VARCHAR(255),
+        created_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        UNIQUE (talent_id, rater_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_character_ratings_talent_id ON character_ratings(talent_id);
     `);
         console.log('✅ Connected to Neon DB. Tables verified/created successfully.');
     }

@@ -54,6 +54,41 @@ export function authenticate(
     }
 }
 
+/**
+ * Optional authentication: attaches req.user when a valid Bearer access JWT
+ * is present, otherwise continues as an anonymous request.
+ */
+export function optionalAuthenticate(
+    req: AuthRequest,
+    _res: Response,
+    next: NextFunction
+): void {
+    try {
+        if (!JWT_SECRET) {
+            next();
+            return;
+        }
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            next();
+            return;
+        }
+        const token = authHeader.substring(7);
+        const payload = jwt.verify(token, JWT_SECRET) as JwtPayload;
+        if (payload.type === 'access' && payload.userId && payload.email && payload.role) {
+            req.user = {
+                userId: payload.userId,
+                email: payload.email,
+                role: payload.role,
+                type: 'access',
+            };
+        }
+    } catch {
+        // Ignore invalid/expired token on public read routes
+    }
+    next();
+}
+
 // ─── Role Guards ──────────────────────────────────────────────────────────
 
 /**

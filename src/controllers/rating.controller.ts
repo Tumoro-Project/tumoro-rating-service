@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { RatingService } from '../services/rating.service';
+import { AuthRequest } from '../middleware/auth.middleware';
 import { BaseScoreInput } from '../models/IDataModels';
 import {
   calculateFamilyHistoryQuestionnaireScore,
@@ -157,28 +158,36 @@ export class RatingController {
   }
 
   /**
+   * POST /v1/character-ratings
+   */
+  public async submitCharacterRating(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const raterId = req.user?.userId;
+      if (!raterId) {
+        res.status(401).json({ message: 'Unauthorized' });
+        return;
+      }
+
+      const result = await ratingService.submitCharacterRating(raterId, req.body);
+      res.status(200).json(result);
+    } catch (err: any) {
+      if (err?.statusCode === 400) {
+        res.status(400).json({ message: err.message });
+        return;
+      }
+      console.error('submitCharacterRating error:', err);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+
+  /**
    * GET /v1/talent/:talentId/character-breakdown
    */
-  public async getCharacterBreakdown(req: Request, res: Response): Promise<void> {
+  public async getCharacterBreakdown(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const breakdown = {
-        totalCount: 0,
-        publicScore: false,
-        averages: {
-          integrity: 0,
-          consistency: 0,
-          investmentInOthers: 0,
-          longTermThinking: 0,
-          honesty: 0,
-        },
-        raterRelationshipCounts: {
-          PROFESSIONAL: 0,
-          COLLEAGUE: 0,
-          COMMUNITY: 0,
-          MENTOR: 0,
-        },
-        hasCharacterMomentum: false,
-      };
+      const talentId = req.params.talentId as string;
+      const viewerId = req.user?.userId;
+      const breakdown = await ratingService.getCharacterBreakdown(talentId, viewerId);
       res.status(200).json(breakdown);
     } catch (err) {
       console.error('getCharacterBreakdown error:', err);
